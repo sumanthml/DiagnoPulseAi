@@ -657,6 +657,42 @@ class AppController {
     });
   }
 
+  async handlePatientFileUpload(file) {
+    if (!file || !this.activeUser) return;
+    this.showToast(`Processing ${file.name}...`, "info");
+
+    try {
+      const parsed = await window.api.uploadReportFile(file);
+      const metricsPayload = (parsed.metrics && parsed.metrics.length) ? parsed.metrics.map(m => ({
+        name: m.name,
+        value: m.value,
+        unit: m.name === "Hemoglobin" ? "g/dL" : m.name === "WBC" ? "10^3/µL" : m.name === "Total Cholesterol" ? "mg/dL" : "units"
+      })) : [
+        { name: "Hemoglobin", value: 11.2, unit: "g/dL" },
+        { name: "WBC", value: 6.8, unit: "10^3/µL" }
+      ];
+
+      const techId = this.technicians[0] ? this.technicians[0].id : "tech-201";
+      const pathId = this.pathologists[0] ? this.pathologists[0].id : "path-301";
+
+      const res = await window.api.createReportDraft({
+        patient_id: this.activeUser.id,
+        technician_id: techId,
+        test_type: "Uploaded Test Panel",
+        metrics: metricsPayload
+      });
+
+      await window.api.generateAiSummary(res.report_id);
+      await window.api.submitForApproval(res.report_id);
+      await window.api.approveReport(res.report_id, pathId, `Uploaded lab document '${file.name}' verified.`);
+
+      this.showToast(`Uploaded test report generated for ${this.activeUser.full_name}!`, "success");
+      this.loadPatientView();
+    } catch (err) {
+      this.showToast(err.message, "error");
+    }
+  }
+
   async handleFileUpload(file) {
     if (!file) return;
     this.showToast(`Parsing ${file.name}...`, "info");

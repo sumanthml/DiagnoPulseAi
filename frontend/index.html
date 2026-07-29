@@ -248,6 +248,22 @@
                 </div>
               </div>
 
+              <!-- Patient File Upload Card -->
+              <div class="glass-card" style="border:1px dashed var(--primary-cyan); background:rgba(0, 245, 212, 0.03);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                  <h3 style="font-size:1.05rem; font-family:var(--font-heading);"><i class="fa-solid fa-cloud-arrow-up text-cyan"></i> Upload Lab Report File (PDF / Image OCR)</h3>
+                  <span class="severity-pill NORMAL">Instant OCR Auto-Parse</span>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.85rem;">
+                  Upload your medical test document (PDF, PNG, JPG) to automatically extract your test metrics into simple 4-step plain English explanations.
+                </p>
+                <div class="file-upload-dropzone" style="background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.15); border-radius:10px; padding:1rem; text-align:center; cursor:pointer;" onclick="document.getElementById('patientFileInput').click()">
+                  <i class="fa-solid fa-file-arrow-up" style="font-size:1.5rem; color:var(--primary-cyan); margin-bottom:0.35rem;"></i>
+                  <div style="font-size:0.85rem; font-weight:600;">Click to Browse or Drag & Drop Test File</div>
+                  <input type="file" id="patientFileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none;" onchange="app.handlePatientFileUpload(this.files[0])" />
+                </div>
+              </div>
+
               <!-- Reports List Header -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;" id="patientReportsHeader">
                 <h3 style="font-family:var(--font-heading); font-size:1.2rem;"><i class="fa-solid fa-file-medical text-emerald"></i> My Medical Reports</h3>

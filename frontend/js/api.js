@@ -1,7 +1,8 @@
 /**
  * Smart Diagnostics - REST API Client Module
  */
-const API_BASE = window.API_BASE || ""; // Production Render Backend API URL or relative origin
+const RENDER_BACKEND_URL = "https://diagnopulse-app.onrender.com";
+const API_BASE = window.API_BASE || (window.location.hostname.includes("vercel.app") ? RENDER_BACKEND_URL : "");
 
 class ApiService {
   async getUsers(role = null) {

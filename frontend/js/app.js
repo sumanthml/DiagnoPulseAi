@@ -1,6 +1,6 @@
 /**
  * Smart Diagnostics - Application Controller
- * Fail-Proof Authentication Sync & Rich Sub-Division Navigation
+ * Strict Role-Based Access Control (RBAC) & Persona Sync Engine
  */
 
 const firebaseConfig = {
@@ -102,13 +102,6 @@ class AppController {
   }
 
   bindEvents() {
-    document.querySelectorAll(".role-pill").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const role = e.currentTarget.dataset.role;
-        this.setRole(role);
-      });
-    });
-
     document.querySelectorAll(".nav-item").forEach(item => {
       item.addEventListener("click", (e) => {
         const view = e.currentTarget.dataset.view;
@@ -208,6 +201,7 @@ class AppController {
       if (user) {
         this.showToast(`Signed in as ${user.full_name}`, "success");
         document.getElementById("authModal").classList.remove("active");
+        await this.loadInitialData();
       }
     } catch (err) {
       this.showAuthError(err.message || "Failed to sign in.");
@@ -267,16 +261,47 @@ class AppController {
   }
 
   demoQuickLogin(role) {
-    let mockUser = {
-      id: role === "PATIENT" ? "pat-101" : role === "LAB_TECHNICIAN" ? "tech-201" : role === "PATHOLOGIST" ? "path-301" : "admin-401",
-      full_name: role === "PATIENT" ? "John Doe" : role === "LAB_TECHNICIAN" ? "Alex Tech" : role === "PATHOLOGIST" ? "Dr. Eleanor Roberts, MD" : "System Admin",
-      email: `${role.toLowerCase()}@diagnopulse.com`,
-      role: role
-    };
+    this.switchPersonaRole(role);
+    document.getElementById("authModal").classList.remove("active");
+  }
+
+  switchPersonaRole(role) {
+    let mockUser;
+    if (role === "PATIENT") {
+      const stored = localStorage.getItem("diagnopulse_user");
+      mockUser = stored ? JSON.parse(stored) : {
+        id: "pat-101",
+        full_name: "John Doe",
+        email: "patient@diagnopulse.com",
+        role: "PATIENT"
+      };
+      mockUser.role = "PATIENT";
+    } else if (role === "LAB_TECHNICIAN") {
+      mockUser = {
+        id: this.technicians[0] ? this.technicians[0].id : "tech-201",
+        full_name: this.technicians[0] ? this.technicians[0].full_name : "Alex Tech",
+        email: "tech@diagnopulse.com",
+        role: "LAB_TECHNICIAN"
+      };
+    } else if (role === "PATHOLOGIST") {
+      mockUser = {
+        id: this.pathologists[0] ? this.pathologists[0].id : "path-301",
+        full_name: this.pathologists[0] ? this.pathologists[0].full_name : "Dr. Eleanor Roberts, MD",
+        email: "doctor@diagnopulse.com",
+        role: "PATHOLOGIST"
+      };
+    } else {
+      mockUser = {
+        id: "admin-401",
+        full_name: "System Admin",
+        email: "admin@diagnopulse.com",
+        role: "ADMIN"
+      };
+    }
 
     this.setLoggedInUser(mockUser);
-    document.getElementById("authModal").classList.remove("active");
-    this.showToast(`Logged in as Persona: ${mockUser.full_name}`, "success");
+    this.setRole(role);
+    this.showToast(`Switched Persona to ${mockUser.full_name} (${role})`, "info");
   }
 
   setLoggedInUser(user) {
@@ -290,6 +315,27 @@ class AppController {
     document.getElementById("userNameLabel").textContent = name;
     document.getElementById("userRoleTag").textContent = this.activeRole;
     document.getElementById("userAvatar").textContent = initials;
+
+    this.applyRoleBasedNavigation();
+  }
+
+  applyRoleBasedNavigation() {
+    const userRole = this.activeUser ? this.activeUser.role : "PATIENT";
+
+    // Filter sidebar navigation blocks based on data-role-group
+    document.querySelectorAll(".nav-category-block").forEach(block => {
+      const allowedRoles = block.dataset.roleGroup ? block.dataset.roleGroup.split(",") : ["ADMIN"];
+      if (allowedRoles.includes(userRole) || userRole === "ADMIN") {
+        block.style.display = "block";
+      } else {
+        block.style.display = "none";
+      }
+    });
+
+    // Update top role pills active highlight
+    document.querySelectorAll(".role-pill").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.role === userRole);
+    });
   }
 
   handleSignOut() {
@@ -318,7 +364,14 @@ class AppController {
     const templateSelect = document.getElementById("selectTemplate");
 
     if (patientSelect) {
-      patientSelect.innerHTML = this.patients.map(p => 
+      // Put active logged-in user at the top if they are a patient
+      let list = [...this.patients];
+      if (this.activeUser && this.activeUser.role === "PATIENT") {
+        list = list.filter(p => p.id !== this.activeUser.id);
+        list.unshift(this.activeUser);
+      }
+
+      patientSelect.innerHTML = list.map(p => 
         `<option value="${p.id}">${p.full_name} (${p.mrn || 'MRN-884920'}) - Age ${p.age || 30}</option>`
       ).join("");
     }
@@ -430,9 +483,7 @@ class AppController {
   setRole(role) {
     this.activeRole = role;
 
-    document.querySelectorAll(".role-pill").forEach(btn => btn.classList.toggle("active", btn.dataset.role === role));
     document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === role));
-
     document.querySelectorAll(".dashboard-view").forEach(el => el.classList.remove("active"));
 
     if (role === "PATIENT") {
@@ -509,8 +560,8 @@ class AppController {
               <button class="btn btn-primary" onclick="app.generateSampleReportForPatient()">
                 <i class="fa-solid fa-bolt text-cyan"></i> Generate Sample Test Report for ${name}
               </button>
-              <button class="btn btn-secondary" onclick="app.setRole('LAB_TECHNICIAN')">
-                <i class="fa-solid fa-vial"></i> Switch to Lab Tech View
+              <button class="btn btn-secondary" onclick="app.switchPersonaRole('LAB_TECHNICIAN')">
+                <i class="fa-solid fa-vial"></i> Switch Persona to Lab Tech
               </button>
             </div>
           </div>
@@ -608,6 +659,7 @@ class AppController {
 
   // --- 2. Tech View Controller ---
   async loadTechView() {
+    this.populateTechFormSelects();
     this.loadTechQueue();
   }
 

@@ -112,7 +112,7 @@
 
   <!-- Main App Layout Shell -->
   <div class="app-layout">
-    <!-- Left Navigation Sidebar with Sub-Divisions -->
+    <!-- Left Navigation Sidebar with Strict RBAC Role Attributes -->
     <aside class="app-sidebar">
       <div class="sidebar-brand">
         <div class="logo-icon"><i class="fa-solid fa-heart-pulse"></i></div>
@@ -123,38 +123,46 @@
       </div>
 
       <nav class="sidebar-nav">
-        <!-- 1. Patient Health Center Section -->
-        <div class="nav-category-header"><i class="fa-solid fa-user-heart"></i> Patient Health</div>
-        <a href="#" class="nav-item active" data-view="PATIENT" id="navItemPatient">
-          <i class="fa-solid fa-house-medical"></i> <span>My Health Dashboard</span>
-        </a>
-        <a href="#" class="nav-item nav-sub-item" data-view="PATIENT" onclick="app.scrollPatientTo('reports')">
-          <i class="fa-solid fa-file-medical"></i> <span>My Medical Reports</span>
-        </a>
-        <a href="#" class="nav-item nav-sub-item" data-view="PATIENT" onclick="app.scrollPatientTo('explainer')">
-          <i class="fa-solid fa-lightbulb"></i> <span>Plain English Guide</span>
-        </a>
+        <!-- 1. Patient Health Section (Visible to PATIENT & ADMIN) -->
+        <div class="nav-category-block" data-role-group="PATIENT,ADMIN">
+          <div class="nav-category-header"><i class="fa-solid fa-user-heart"></i> Patient Health</div>
+          <a href="#" class="nav-item active" data-view="PATIENT" id="navItemPatient">
+            <i class="fa-solid fa-house-medical"></i> <span>My Health Dashboard</span>
+          </a>
+          <a href="#" class="nav-item nav-sub-item" data-view="PATIENT" onclick="app.scrollPatientTo('reports')">
+            <i class="fa-solid fa-file-medical"></i> <span>My Medical Reports</span>
+          </a>
+          <a href="#" class="nav-item nav-sub-item" data-view="PATIENT" onclick="app.scrollPatientTo('explainer')">
+            <i class="fa-solid fa-lightbulb"></i> <span>Plain English Guide</span>
+          </a>
+        </div>
 
-        <!-- 2. Lab Operations Section -->
-        <div class="nav-category-header"><i class="fa-solid fa-vial"></i> Lab Operations</div>
-        <a href="#" class="nav-item" data-view="LAB_TECHNICIAN" id="navItemTech">
-          <i class="fa-solid fa-vial-circle-check"></i> <span>Lab Technician Entry</span>
-        </a>
-        <a href="#" class="nav-item nav-sub-item" data-view="LAB_TECHNICIAN">
-          <i class="fa-solid fa-sliders"></i> <span>Range Gauge Meter</span>
-        </a>
+        <!-- 2. Lab Operations Section (Visible to LAB_TECHNICIAN & ADMIN) -->
+        <div class="nav-category-block" data-role-group="LAB_TECHNICIAN,ADMIN">
+          <div class="nav-category-header"><i class="fa-solid fa-vial"></i> Lab Operations</div>
+          <a href="#" class="nav-item" data-view="LAB_TECHNICIAN" id="navItemTech">
+            <i class="fa-solid fa-vial-circle-check"></i> <span>Lab Technician Entry</span>
+          </a>
+          <a href="#" class="nav-item nav-sub-item" data-view="LAB_TECHNICIAN">
+            <i class="fa-solid fa-sliders"></i> <span>Range Gauge Meter</span>
+          </a>
+        </div>
 
-        <!-- 3. Doctor Review Section -->
-        <div class="nav-category-header"><i class="fa-solid fa-user-doctor"></i> Clinical Doctor</div>
-        <a href="#" class="nav-item" data-view="PATHOLOGIST" id="navItemPathologist">
-          <i class="fa-solid fa-user-doctor"></i> <span>Doctor Review Queue</span>
-        </a>
+        <!-- 3. Doctor Review Section (Visible to PATHOLOGIST & ADMIN) -->
+        <div class="nav-category-block" data-role-group="PATHOLOGIST,ADMIN">
+          <div class="nav-category-header"><i class="fa-solid fa-user-doctor"></i> Clinical Doctor</div>
+          <a href="#" class="nav-item" data-view="PATHOLOGIST" id="navItemPathologist">
+            <i class="fa-solid fa-user-doctor"></i> <span>Doctor Review Queue</span>
+          </a>
+        </div>
 
-        <!-- 4. System Admin Section -->
-        <div class="nav-category-header"><i class="fa-solid fa-shield-halved"></i> Platform Admin</div>
-        <a href="#" class="nav-item" data-view="ADMIN" id="navItemAdmin">
-          <i class="fa-solid fa-clock-rotate-left"></i> <span>Admin Audit Logs</span>
-        </a>
+        <!-- 4. System Admin Section (Visible to ADMIN) -->
+        <div class="nav-category-block" data-role-group="ADMIN">
+          <div class="nav-category-header"><i class="fa-solid fa-shield-halved"></i> Platform Admin</div>
+          <a href="#" class="nav-item" data-view="ADMIN" id="navItemAdmin">
+            <i class="fa-solid fa-clock-rotate-left"></i> <span>Admin Audit Logs</span>
+          </a>
+        </div>
       </nav>
 
       <div class="sidebar-footer">
@@ -177,12 +185,12 @@
         </div>
 
         <div class="top-user-actions">
-          <!-- Role Switcher Quick Pills -->
+          <!-- Role Persona Switcher Quick Pills -->
           <div class="role-pills">
-            <button class="role-pill active" data-role="PATIENT" id="roleBtnPatient"><i class="fa-solid fa-user-injured"></i> Patient</button>
-            <button class="role-pill" data-role="LAB_TECHNICIAN" id="roleBtnTech"><i class="fa-solid fa-vial"></i> Tech</button>
-            <button class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist"><i class="fa-solid fa-user-doctor"></i> Doctor</button>
-            <button class="role-pill" data-role="ADMIN" id="roleBtnAdmin"><i class="fa-solid fa-shield-halved"></i> Admin</button>
+            <button class="role-pill active" data-role="PATIENT" id="roleBtnPatient" onclick="app.switchPersonaRole('PATIENT')"><i class="fa-solid fa-user-injured"></i> Patient</button>
+            <button class="role-pill" data-role="LAB_TECHNICIAN" id="roleBtnTech" onclick="app.switchPersonaRole('LAB_TECHNICIAN')"><i class="fa-solid fa-vial"></i> Tech</button>
+            <button class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist" onclick="app.switchPersonaRole('PATHOLOGIST')"><i class="fa-solid fa-user-doctor"></i> Doctor</button>
+            <button class="role-pill" data-role="ADMIN" id="roleBtnAdmin" onclick="app.switchPersonaRole('ADMIN')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
           </div>
 
           <!-- User Profile & Sign Out -->

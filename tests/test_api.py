@@ -51,3 +51,14 @@ def test_pdf_report_download():
         assert pdf_res.status_code == 200
         assert pdf_res.headers["content-type"] == "application/pdf"
         assert pdf_res.content.startswith(b"%PDF")
+
+
+def test_file_upload_parser():
+    file_content = b"Lab Result Report: Hemoglobin: 13.5 g/dL, WBC: 6.2 10^3/uL, Glucose: 95 mg/dL"
+    files = {"file": ("test_report.txt", file_content, "text/plain")}
+    response = client.post("/api/reports/upload-file", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert "metrics" in data
+    assert len(data["metrics"]) >= 1
+

@@ -115,6 +115,20 @@ class ApiService {
     return await res.json();
   }
 
+  async uploadReportFile(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/api/reports/upload-file`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Failed to parse lab file upload");
+    }
+    return await res.json();
+  }
+
   getPdfUrl(reportId) {
     return `${API_BASE}/api/reports/${reportId}/pdf`;
   }

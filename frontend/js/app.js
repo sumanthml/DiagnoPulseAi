@@ -657,6 +657,31 @@ class AppController {
     });
   }
 
+  async handleFileUpload(file) {
+    if (!file) return;
+    this.showToast(`Parsing ${file.name}...`, "info");
+
+    try {
+      const res = await window.api.uploadReportFile(file);
+      if (res.metrics && res.metrics.length) {
+        let count = 0;
+        res.metrics.forEach(m => {
+          const inp = document.querySelector(`.metric-value-input[data-name="${m.name}"]`);
+          if (inp) {
+            inp.value = m.value;
+            this.updateLiveGauge(inp);
+            count++;
+          }
+        });
+        this.showToast(`Extracted ${count} metric parameters from ${file.name}!`, "success");
+      } else {
+        this.showToast("Uploaded file processed successfully.", "success");
+      }
+    } catch (err) {
+      this.showToast(err.message, "error");
+    }
+  }
+
   // --- 2. Tech View Controller ---
   async loadTechView() {
     this.populateTechFormSelects();

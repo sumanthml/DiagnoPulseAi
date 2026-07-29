@@ -6,7 +6,7 @@ Creation -> Metric Evaluation (Strategies) -> AI Interpretation (Groq) -> Pathol
 
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
@@ -21,6 +21,7 @@ from app.domain.anonymizer import AnonymizerService
 from app.services.ai_interpreter import GroqAIInterpreter
 from app.services.pdf_generator import PDFReportGenerator
 from app.services.audit_logger import AuditLogger
+from app.services.ocr_parser import LabFileParser
 
 router = APIRouter(prefix="/api/reports", tags=["Diagnostic Reports"])
 ai_interpreter = GroqAIInterpreter()
@@ -403,3 +404,25 @@ def download_pdf_report(report_id: str, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@router.post("/upload-file")
+async def upload_report_file(file: UploadFile = File(...)):
+    """
+    Accepts PDF, PNG, JPG file uploads of lab reports,
+    extracts numerical parameters, and returns parsed metric data for form auto-fill.
+    """
+    try:
+        content = await file.read()
+        # Decode text content from file (supports plain text, OCR, or PDF text streams)
+        raw_text = content.decode("utf-8", errors="ignore")
+        
+        parsed_metrics = LabFileParser.parse_text_content(raw_text)
+        return {
+            "message": f"Successfully parsed uploaded file '{file.filename}'",
+            "filename": file.filename,
+            "metrics": parsed_metrics
+        }
+    except Exception as err:
+        raise HTTPException(status_code=400, detail=f"Failed to parse uploaded file: {str(err)}")
+

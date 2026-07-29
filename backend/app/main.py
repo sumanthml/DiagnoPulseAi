@@ -49,11 +49,11 @@ if os.path.exists(FRONTEND_DIR):
     app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
     app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
 
-    @app.get("/", include_in_schema=False)
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
     def serve_frontend_index():
         return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
-@app.get("/health", tags=["Health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
 def health_check():
     return {"status": "healthy", "service": "Smart Diagnostics API"}

@@ -1,6 +1,6 @@
 /**
  * Smart Diagnostics - Application Controller
- * Patient-Centric & Dynamic Auth Overhaul
+ * Strict Full-Name Profile Resolution & Plain-Language Engine
  */
 
 const firebaseConfig = {
@@ -28,33 +28,38 @@ class AppController {
     this.glossaryDict = {
       "Hemoglobin": {
         title: "Hemoglobin (Hb)",
-        meaning: "Carries oxygen from your lungs to the rest of your body.",
-        normal: "Normal Range: 13.8 – 17.2 g/dL (Men) / 12.1 – 15.1 g/dL (Women)",
-        whatItMeans: "If low: You may feel tired or short of breath (mild anemia). Iron-rich foods like spinach and lean meats help. If high: Blood may be thicker, often due to dehydration."
+        meaning: "Carries oxygen from your lungs to your muscles and brain.",
+        normal: "Normal Safe Target: 13.8 – 17.2 g/dL (Men) / 12.1 – 15.1 g/dL (Women)",
+        whatItMeans: "Your score is slightly low, which can cause mild tiredness or feeling cold.",
+        simpleAdvice: "Eat iron-rich foods like spinach, beans, apples, and lean meats."
       },
       "Total Cholesterol": {
         title: "Total Cholesterol",
-        meaning: "Measures blood fats essential for cell building and hormone production.",
-        normal: "Desirable Target: Below 200 mg/dL",
-        whatItMeans: "If elevated: Higher blood fat levels can build up in blood vessels. Exercise, reducing saturated fats, and staying active help maintain healthy levels."
+        meaning: "Measures blood fats essential for cell walls and body hormones.",
+        normal: "Healthy Target: Below 200 mg/dL",
+        whatItMeans: "Higher blood fats can build up in blood vessels over time.",
+        simpleAdvice: "Enjoy 30 mins of daily walking and reduce fried foods."
       },
       "WBC": {
         title: "White Blood Cells (WBC)",
-        meaning: "Your body's immune system defense forces that fight infections.",
+        meaning: "Your body's immune defense forces that fight off sickness and germs.",
         normal: "Normal Range: 4.5 – 11.0 10^3/µL",
-        whatItMeans: "If elevated: Your immune system is actively fighting an infection or inflammation. If low: Immune defenses may be slightly weakened."
+        whatItMeans: "Your immune system is active and protecting your body.",
+        simpleAdvice: "Stay well-rested and drink plenty of water."
       },
       "Fasting Glucose": {
         title: "Fasting Blood Sugar (Glucose)",
-        meaning: "Main source of energy for your body's cells derived from food.",
+        meaning: "Main fuel source for your body derived from healthy food.",
         normal: "Normal Target: 70 – 99 mg/dL",
-        whatItMeans: "If elevated above 100 mg/dL: Indicates higher blood sugar levels. Staying hydrated and reducing refined sugars supports balanced glucose."
+        whatItMeans: "Slightly elevated sugar levels indicate energy processing in progress.",
+        simpleAdvice: "Drink water, walk after meals, and avoid sugary soft drinks."
       },
       "TSH": {
-        title: "Thyroid Stimulating Hormone (TSH)",
-        meaning: "Controls your thyroid gland, regulating your body's energy & metabolism speed.",
+        title: "Thyroid Hormone (TSH)",
+        meaning: "Controls your body's energy speed and metabolism.",
         normal: "Normal Range: 0.45 – 4.5 mIU/L",
-        whatItMeans: "If high: Your thyroid is underactive (sluggish metabolism). If low: Your thyroid is overactive (fast metabolism)."
+        whatItMeans: "Controls how fast your body burns energy and regulates temperature.",
+        simpleAdvice: "Maintain regular sleep patterns and balanced meals."
       }
     };
 
@@ -68,16 +73,10 @@ class AppController {
         firebase.initializeApp(firebaseConfig);
         this.firebaseAuth = firebase.auth();
 
-        this.firebaseAuth.onAuthStateChanged((user) => {
+        this.firebaseAuth.onAuthStateChanged(async (user) => {
           if (user) {
-            console.log("Firebase User Logged In:", user.email);
-            // Hydrate active user state
-            this.setLoggedInUser({
-              id: user.uid,
-              email: user.email,
-              full_name: user.displayName || user.email.split('@')[0],
-              role: this.activeRole
-            });
+            console.log("Firebase Auth Logged In:", user.email);
+            await this.syncUserFromDatabase(user.email, user.displayName);
             document.getElementById("authModal").classList.remove("active");
           }
         });
@@ -163,6 +162,27 @@ class AppController {
     if (alertBox) alertBox.style.display = "none";
   }
 
+  async syncUserFromDatabase(email, fallbackName) {
+    try {
+      const users = await window.api.getUsers();
+      let match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+      if (!match) {
+        match = await window.api.createUser({
+          email: email,
+          full_name: fallbackName || email.split('@')[0],
+          role: "PATIENT",
+          age: 30,
+          gender: "Male"
+        });
+      }
+
+      this.setLoggedInUser(match);
+    } catch (e) {
+      console.warn("DB Sync Notice:", e);
+    }
+  }
+
   async handleLogin(e) {
     e.preventDefault();
     this.hideAuthError();
@@ -178,23 +198,8 @@ class AppController {
         await this.firebaseAuth.signInWithEmailAndPassword(email, password);
       }
 
-      // Check if user exists in database
-      const users = await window.api.getUsers();
-      let match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-
-      if (!match) {
-        // Auto-provision user record if first login
-        match = await window.api.createUser({
-          email: email,
-          full_name: email.split('@')[0].replace('.', ' '),
-          role: "PATIENT",
-          age: 30,
-          gender: "Male"
-        });
-      }
-
-      this.setLoggedInUser(match);
-      this.showToast(`Welcome back, ${match.full_name}!`, "success");
+      await this.syncUserFromDatabase(email);
+      this.showToast(`Welcome back, ${this.activeUser ? this.activeUser.full_name : email}!`, "success");
       document.getElementById("authModal").classList.remove("active");
     } catch (err) {
       let friendlyMsg = err.message || "Failed to sign in.";
@@ -224,7 +229,10 @@ class AppController {
 
     try {
       if (this.firebaseAuth) {
-        await this.firebaseAuth.createUserWithEmailAndPassword(email, password);
+        const cred = await this.firebaseAuth.createUserWithEmailAndPassword(email, password);
+        if (cred.user) {
+          await cred.user.updateProfile({ displayName: fullName });
+        }
       }
 
       const dbUser = await window.api.createUser({
@@ -236,7 +244,7 @@ class AppController {
       });
 
       this.setLoggedInUser(dbUser);
-      this.showToast("Account created successfully!", "success");
+      this.showToast(`Account created for ${fullName}!`, "success");
       document.getElementById("authModal").classList.remove("active");
       await this.loadInitialData();
       this.setRole(role);
@@ -248,7 +256,7 @@ class AppController {
       this.showAuthError(friendlyMsg);
     } finally {
       btn.disabled = false;
-      btn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Create Firebase Account`;
+      btn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Create Account`;
     }
   }
 
@@ -439,7 +447,7 @@ class AppController {
   // --- 1. Patient View Controller ---
   async loadPatientView() {
     const container = document.getElementById("patientReportsList");
-    container.innerHTML = `<div class="glass-card"><i class="fa-solid fa-spinner fa-spin"></i> Fetching your verified diagnostic reports...</div>`;
+    container.innerHTML = `<div class="glass-card"><i class="fa-solid fa-spinner fa-spin"></i> Fetching your diagnostic reports...</div>`;
 
     try {
       const patientId = this.activeUser ? this.activeUser.id : "pat-101";
@@ -451,10 +459,10 @@ class AppController {
         container.innerHTML = `
           <div class="glass-card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:2.5rem;">
             <i class="fa-solid fa-folder-open" style="font-size:2.5rem; margin-bottom:0.75rem; color:var(--primary-cyan);"></i>
-            <h3>No Verified Reports Found For Your Account</h3>
-            <p style="font-size:0.85rem; margin-top:0.35rem;">When your clinic lab technician processes your test metrics, your plain-language report will appear here automatically!</p>
+            <h3>No Verified Reports Found For ${this.activeUser ? this.activeUser.full_name : 'Your Account'}</h3>
+            <p style="font-size:0.85rem; margin-top:0.35rem;">When your clinic processes your lab metrics, your plain-language report will appear here automatically!</p>
             <button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="app.setRole('LAB_TECHNICIAN')">
-              <i class="fa-solid fa-plus"></i> Switch to Lab Tech View to Create Test Report
+              <i class="fa-solid fa-plus"></i> Switch to Lab Tech View to Create Test Entry
             </button>
           </div>
         `;
@@ -471,17 +479,18 @@ class AppController {
             <span class="status-badge ${r.status}">${r.status}</span>
           </div>
 
-          <div class="ai-highlight-box">
-            <div class="ai-box-title"><i class="fa-solid fa-brain"></i> AI Plain-Language Explanation</div>
-            <p style="font-size:0.825rem; line-height:1.45;">${r.ai_summary ? r.ai_summary.substring(0, 220) + '...' : 'No summary available.'}</p>
+          <!-- 4-Step Plain Language Explanation Box -->
+          <div class="plain-explainer-display" style="border-color: rgba(58,134,255,0.4); margin-bottom:0.75rem;">
+            <div class="ai-box-title"><i class="fa-solid fa-comment-medical text-cyan"></i> Everyday Plain-Language Medical Insight</div>
+            <p style="font-size:0.825rem; line-height:1.45; color:#f8fafc;">${r.ai_summary || 'No summary available.'}</p>
           </div>
 
-          <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.5rem;">
-            <i class="fa-solid fa-signature text-emerald"></i> Reviewed by: <strong>${r.approved_by_name || 'Dr. Eleanor Roberts, MD'}</strong>
+          <div style="font-size:0.8rem; color:var(--text-muted);">
+            <i class="fa-solid fa-signature text-emerald"></i> Doctor Review: <strong>${r.approved_by_name || 'Dr. Eleanor Roberts, MD'}</strong>
           </div>
 
           <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
-            <button class="btn btn-primary btn-sm" onclick="app.viewReportModal('${r.id}')"><i class="fa-solid fa-eye"></i> Plain-Language Details</button>
+            <button class="btn btn-primary btn-sm" onclick="app.viewReportModal('${r.id}')"><i class="fa-solid fa-eye"></i> View 4-Step Metric Breakdown</button>
             <a href="${window.api.getPdfUrl(r.id)}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download PDF</a>
           </div>
         </div>
@@ -499,9 +508,10 @@ class AppController {
 
     display.innerHTML = `
       <div class="ai-box-title"><i class="fa-solid fa-lightbulb text-cyan"></i> ${item.title} Explained</div>
-      <p style="font-weight:600; color:#fff; margin-bottom:0.25rem;">What it does: ${item.meaning}</p>
-      <p style="font-size:0.775rem; color:var(--primary-cyan); margin-bottom:0.35rem;">${item.normal}</p>
-      <p style="font-size:0.8rem; color:var(--text-muted);">${item.whatItMeans}</p>
+      <p style="font-weight:600; color:#fff; margin-bottom:0.25rem;">1. Body Function: ${item.meaning}</p>
+      <p style="font-size:0.775rem; color:var(--primary-cyan); margin-bottom:0.35rem;">2. Safe Target: ${item.normal}</p>
+      <p style="font-size:0.8rem; color:#cbd5e1; margin-bottom:0.35rem;">3. What It Means: ${item.whatItMeans}</p>
+      <p style="font-size:0.8rem; color:var(--status-normal); font-weight:600;">4. Simple Advice: ${item.simpleAdvice}</p>
     `;
   }
 
@@ -526,7 +536,7 @@ class AppController {
             fill: true
           },
           {
-            label: 'Target Normal Min (13.8 g/dL)',
+            label: 'Target Safe Min (13.8 g/dL)',
             data: [13.8, 13.8, 13.8, 13.8, 13.8],
             borderColor: '#10b981',
             borderDash: [5, 5],
@@ -578,11 +588,11 @@ class AppController {
         metrics: metricsPayload
       });
 
-      this.showToast(`Draft created! Running Groq AI summary engine...`, "success");
+      this.showToast(`Draft created! Generating AI summary...`, "success");
       await window.api.generateAiSummary(res.report_id);
       await window.api.submitForApproval(res.report_id);
 
-      this.showToast(`Submitted to Pathologist queue!`, "success");
+      this.showToast(`Submitted to Doctor queue!`, "success");
       this.loadTechQueue();
     } catch (err) {
       this.showToast(err.message, "error");
@@ -637,7 +647,7 @@ class AppController {
           <div class="glass-card" style="text-align:center; color:var(--text-muted); padding:2.5rem;">
             <i class="fa-solid fa-circle-check text-emerald" style="font-size:2.5rem; margin-bottom:0.5rem;"></i>
             <h3>All Reports Verified!</h3>
-            <p>No reports currently awaiting pathologist review.</p>
+            <p>No reports currently awaiting doctor review.</p>
           </div>
         `;
         return;
@@ -655,7 +665,7 @@ class AppController {
             </div>
 
             <div class="ai-highlight-box" style="margin-bottom:1rem;">
-              <div class="ai-box-title"><i class="fa-solid fa-brain"></i> Anonymized AI Summary (Groq LLaMA)</div>
+              <div class="ai-box-title"><i class="fa-solid fa-brain"></i> Anonymized AI Summary</div>
               <p style="font-size:0.8rem; line-height:1.4;">${r.ai_summary || 'AI Summary pending.'}</p>
             </div>
           </div>
@@ -663,7 +673,7 @@ class AppController {
           <div style="display:flex; flex-direction:column; justify-content:space-between; background:rgba(0,0,0,0.2); padding:1rem; border-radius:12px; border:1px solid var(--border-color);">
             <div>
               <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted); margin-bottom:0.35rem; display:block;">
-                Pathologist Clinical Verification Notes
+                Doctor Verification Notes
               </label>
               <textarea class="form-control" id="notes_${r.id}" rows="4" placeholder="Enter clinical observations..."></textarea>
             </div>
@@ -691,7 +701,7 @@ class AppController {
       const notes = notesInp ? notesInp.value : "";
 
       await window.api.approveReport(reportId, pathologistId, notes);
-      this.showToast("Report approved & electronically signed by Pathologist!", "success");
+      this.showToast("Report approved & electronically signed!", "success");
       this.loadPathologistView();
     } catch (err) {
       this.showToast(err.message, "error");
@@ -750,37 +760,41 @@ class AppController {
         </div>
 
         <div style="margin-top:1rem;">
-          <strong style="font-size:0.85rem; color:var(--primary-cyan);">Measured Parameters & Range Flags:</strong>
+          <strong style="font-size:0.85rem; color:var(--primary-cyan);">4-Step Parameter Breakdown:</strong>
           <table class="data-table" style="margin-top:0.5rem;">
             <thead>
               <tr>
-                <th>Parameter</th>
-                <th>Result</th>
-                <th>Unit</th>
-                <th>Status Flag</th>
+                <th>1. Measured Parameter</th>
+                <th>2. Result</th>
+                <th>3. Status</th>
+                <th>4. Everyday Advice</th>
               </tr>
             </thead>
             <tbody>
-              ${r.metrics.map(m => `
-                <tr>
-                  <td><strong>${m.metric_name}</strong></td>
-                  <td>${m.value}</td>
-                  <td>${m.unit}</td>
-                  <td><span class="severity-pill ${m.severity}">${m.severity}</span></td>
-                </tr>
-              `).join("")}
+              ${r.metrics.map(m => {
+                const info = this.glossaryDict[m.metric_name] || {};
+                const advice = info.simpleAdvice || "Follow doctor guidance.";
+                return `
+                  <tr>
+                    <td><strong>${m.metric_name}</strong><br/><small class="text-muted">${info.meaning || ''}</small></td>
+                    <td>${m.value} ${m.unit}</td>
+                    <td><span class="severity-pill ${m.severity}">${m.severity}</span></td>
+                    <td><small style="color:var(--text-muted);">${advice}</small></td>
+                  </tr>
+                `;
+              }).join("")}
             </tbody>
           </table>
         </div>
 
         <div class="ai-highlight-box" style="margin-top:1rem;">
-          <div class="ai-box-title"><i class="fa-solid fa-brain"></i> Plain-Language AI Interpretation</div>
+          <div class="ai-box-title"><i class="fa-solid fa-brain"></i> Plain-Language AI Summary</div>
           <p style="font-size:0.825rem; line-height:1.5;">${r.ai_summary || 'No summary available.'}</p>
         </div>
 
         ${r.pathologist_notes ? `
           <div style="background:rgba(255,255,255,0.03); padding:0.85rem; border-radius:10px; border:1px solid var(--border-color); margin-top:0.75rem;">
-            <strong style="font-size:0.8rem; color:var(--status-normal);"><i class="fa-solid fa-signature"></i> Pathologist Clinical Verification:</strong>
+            <strong style="font-size:0.8rem; color:var(--status-normal);"><i class="fa-solid fa-signature"></i> Doctor Clinical Verification:</strong>
             <p style="font-size:0.825rem; color:var(--text-muted); margin-top:0.25rem;">${r.pathologist_notes}</p>
           </div>
         ` : ''}

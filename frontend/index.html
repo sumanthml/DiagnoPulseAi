@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Diagnostics - Capstone Lab Management System</title>
+
+  <!-- Google Fonts & FontAwesome 6 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Chart.js for Medical Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase Web SDK (v10 Compat for browser stability) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+  <!-- Custom CSS Design System -->
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+  <!-- Firebase Auth Modal Overlay (Sign In / Register) -->
+  <div class="auth-modal-overlay active" id="authModal">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="logo-icon-lg"><i class="fa-solid fa-microscope"></i></div>
+        <h2>Smart Diagnostics</h2>
+        <p>Enterprise Diagnostic Interpretation Platform</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab-btn active" id="tabLogin" onclick="app.switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab-btn" id="tabRegister" onclick="app.switchAuthTab('register')">Register Account</button>
+      </div>
+
+      <!-- Sign In Form -->
+      <form id="formLogin" class="auth-form active">
+        <div class="form-group">
+          <label><i class="fa-solid fa-envelope"></i> Email Address</label>
+          <input type="email" id="loginEmail" class="form-control" placeholder="john.doe@patient.com" value="john.doe@patient.com" required />
+        </div>
+        <div class="form-group">
+          <label><i class="fa-solid fa-lock"></i> Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" value="password123" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnLoginSubmit">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal
+        </button>
+        <div class="quick-demo-accounts">
+          <span>Quick Demo One-Click Sign-In:</span>
+          <div class="demo-buttons">
+            <button type="button" class="btn-demo" onclick="app.demoQuickLogin('PATIENT')">Patient</button>
+            <button type="button" class="btn-demo" onclick="app.demoQuickLogin('LAB_TECHNICIAN')">Lab Tech</button>
+            <button type="button" class="btn-demo" onclick="app.demoQuickLogin('PATHOLOGIST')">Pathologist</button>
+            <button type="button" class="btn-demo" onclick="app.demoQuickLogin('ADMIN')">Admin</button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Register Form -->
+      <form id="formRegister" class="auth-form">
+        <div class="form-group">
+          <label><i class="fa-solid fa-user"></i> Full Name</label>
+          <input type="text" id="regFullName" class="form-control" placeholder="Dr. Jane Smith" required />
+        </div>
+        <div class="form-group-row">
+          <div class="form-group">
+            <label><i class="fa-solid fa-user-tag"></i> Platform Role</label>
+            <select id="regRole" class="form-control" required>
+              <option value="PATIENT">Patient</option>
+              <option value="LAB_TECHNICIAN">Lab Technician</option>
+              <option value="PATHOLOGIST">Pathologist / Doctor</option>
+              <option value="ADMIN">System Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><i class="fa-solid fa-cake-candles"></i> Age / Gender</label>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="number" id="regAge" class="form-control" placeholder="40" value="40" min="0" max="150" />
+              <select id="regGender" class="form-control">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label><i class="fa-solid fa-envelope"></i> Email Address</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="user@diagnopulse.com" required />
+        </div>
+        <div class="form-group">
+          <label><i class="fa-solid fa-lock"></i> Password</label>
+          <input type="password" id="regPassword" class="form-control" placeholder="At least 6 characters" minlength="6" required />
+        </div>
+        <button type="submit" class="btn btn-success btn-block" id="btnRegisterSubmit">
+          <i class="fa-solid fa-user-plus"></i> Create Firebase Account
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- Main App Layout Shell -->
+  <div class="app-layout">
+    <!-- Left Navigation Sidebar -->
+    <aside class="app-sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-icon"><i class="fa-solid fa-microscope"></i></div>
+        <div class="brand-text">
+          <h2>Smart Diagnostics</h2>
+          <span>Enterprise System</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="PATIENT" id="navItemPatient">
+          <i class="fa-solid fa-notes-medical"></i> <span>Patient Portal</span>
+        </a>
+        <a href="#" class="nav-item" data-view="LAB_TECHNICIAN" id="navItemTech">
+          <i class="fa-solid fa-vial-circle-check"></i> <span>Lab Technician Entry</span>
+        </a>
+        <a href="#" class="nav-item" data-view="PATHOLOGIST" id="navItemPathologist">
+          <i class="fa-solid fa-user-doctor"></i> <span>Pathologist Review</span>
+        </a>
+        <a href="#" class="nav-item" data-view="ADMIN" id="navItemAdmin">
+          <i class="fa-solid fa-shield-halved"></i> <span>Admin Audit Logs</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="connection-status">
+          <span class="status-dot green"></span> Supabase Cloud Connected
+        </div>
+        <div class="connection-status">
+          <span class="status-dot blue"></span> Groq LLaMA 3.3 Active
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Workspace Area -->
+    <div class="app-main-workspace">
+      <!-- Top Action Bar -->
+      <header class="top-bar">
+        <div class="top-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" placeholder="Search reports, patients, MRNs..." />
+        </div>
+
+        <div class="top-user-actions">
+          <!-- Role Switcher Quick Pills -->
+          <div class="role-pills">
+            <button class="role-pill active" data-role="PATIENT" id="roleBtnPatient"><i class="fa-solid fa-user-injured"></i> Patient</button>
+            <button class="role-pill" data-role="LAB_TECHNICIAN" id="roleBtnTech"><i class="fa-solid fa-vial"></i> Tech</button>
+            <button class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist"><i class="fa-solid fa-user-doctor"></i> Pathologist</button>
+            <button class="role-pill" data-role="ADMIN" id="roleBtnAdmin"><i class="fa-solid fa-shield-halved"></i> Admin</button>
+          </div>
+
+          <!-- User Profile & Sign Out -->
+          <div class="user-profile-menu">
+            <div class="user-avatar" id="userAvatar">JD</div>
+            <div class="user-details">
+              <span class="user-name" id="userNameLabel">John Doe</span>
+              <span class="user-role-tag" id="userRoleTag">PATIENT</span>
+            </div>
+            <button class="btn-logout" title="Sign Out" onclick="app.handleSignOut()"><i class="fa-solid fa-right-from-bracket"></i></button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Dashboard Views Workspace -->
+      <main class="workspace-content">
+
+        <!-- 1. PATIENT DASHBOARD VIEW -->
+        <section class="dashboard-view active" id="viewPatient">
+          <div class="view-header">
+            <div>
+              <h2><i class="fa-solid fa-heart-pulse text-emerald"></i> Patient Diagnostic Health Portal</h2>
+              <p>View verified clinical findings, plain-language AI diagnostic insights, and download official PDF reports.</p>
+            </div>
+            <button class="btn btn-secondary" onclick="app.loadPatientView()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          </div>
+
+          <!-- Analytics Chart & Stats Header -->
+          <div class="analytics-row">
+            <div class="glass-card stat-box">
+              <div class="stat-icon blue"><i class="fa-solid fa-file-waveform"></i></div>
+              <div>
+                <span class="stat-label">Total Completed Reports</span>
+                <h3 class="stat-val" id="patientStatTotal">1</h3>
+              </div>
+            </div>
+            <div class="glass-card stat-box">
+              <div class="stat-icon green"><i class="fa-solid fa-shield-check"></i></div>
+              <div>
+                <span class="stat-label">Verified Status</span>
+                <h3 class="stat-val text-emerald">Approved</h3>
+              </div>
+            </div>
+            <div class="glass-card stat-box">
+              <div class="stat-icon purple"><i class="fa-solid fa-brain"></i></div>
+              <div>
+                <span class="stat-label">AI Summary Engine</span>
+                <h3 class="stat-val text-blue">Groq LLaMA 3.3</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reports Grid -->
+          <div class="reports-grid" id="patientReportsList">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </section>
+
+
+        <!-- 2. LAB TECHNICIAN DASHBOARD VIEW -->
+        <section class="dashboard-view" id="viewTech">
+          <div class="view-header">
+            <div>
+              <h2><i class="fa-solid fa-flask-vial text-blue"></i> Lab Technician Entry & Dynamic Evaluator</h2>
+              <p>Enter measured values with live visual range gauge indicators, trigger Groq AI summaries, and submit for Pathologist sign-off.</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <!-- New Entry Form -->
+            <div class="glass-card form-card">
+              <h3><i class="fa-solid fa-plus-circle"></i> Create Diagnostic Entry</h3>
+
+              <form id="techCreateReportForm">
+                <div class="form-group-row">
+                  <div class="form-group">
+                    <label for="selectPatient"><i class="fa-solid fa-hospital-user"></i> Patient Account</label>
+                    <select id="selectPatient" class="form-control" required></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="selectTemplate"><i class="fa-solid fa-list-check"></i> Diagnostic Test Panel</label>
+                    <select id="selectTemplate" class="form-control" required></select>
+                  </div>
+                </div>
+
+                <div class="form-section-title">
+                  <span>Dynamic Parameter Inputs & Live Range Gauge</span>
+                </div>
+
+                <!-- Interactive Metric Input Table with Gauge Sliders -->
+                <div class="metrics-input-table" id="metricsInputContainer">
+                  <!-- Generated dynamically with live gauge feedback -->
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                  <button type="submit" class="btn btn-primary" id="btnSubmitTechReport">
+                    <i class="fa-solid fa-microscope"></i> Evaluate Ranges & Save Draft
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Queue Card -->
+            <div class="glass-card queue-card">
+              <h3><i class="fa-solid fa-clipboard-list"></i> Technician Activity Queue</h3>
+              <div class="queue-list" id="techQueueList"></div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 3. PATHOLOGIST DASHBOARD VIEW -->
+        <section class="dashboard-view" id="viewPathologist">
+          <div class="view-header">
+            <div>
+              <h2><i class="fa-solid fa-user-doctor text-emerald"></i> Pathologist Verification Dashboard</h2>
+              <p>Inspect AI-assisted draft reports, evaluate abnormal range flags, add clinical notes, and execute digital sign-off.</p>
+            </div>
+            <div class="pending-count-tag" id="pendingCountBadge"><i class="fa-solid fa-clock"></i> 0 Pending Approvals</div>
+          </div>
+
+          <div class="pathologist-grid" id="pathologistQueueList">
+            <!-- Dynamically populated review cards -->
+          </div>
+        </section>
+
+
+        <!-- 4. ADMIN DASHBOARD VIEW -->
+        <section class="dashboard-view" id="viewAdmin">
+          <div class="view-header">
+            <div>
+              <h2><i class="fa-solid fa-shield-halved text-purple"></i> Platform Administration</h2>
+              <p>Manage test templates, inspect database schemas, and query immutable HIPAA audit logs.</p>
+            </div>
+            <button class="btn btn-primary" onclick="app.loadAdminView()"><i class="fa-solid fa-rotate"></i> Refresh Audit Trail</button>
+          </div>
+
+          <div class="glass-card">
+            <h3><i class="fa-solid fa-clock-rotate-left"></i> System Immutable Audit Logs</h3>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="adminAuditLogTable">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Report Details Modal -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalReportTitle">Diagnostic Report Details</h3>
+        <button class="modal-close" onclick="app.closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalReportBody"></div>
+      <div class="modal-footer" id="modalReportFooter">
+        <button class="btn btn-secondary" onclick="app.closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- App Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

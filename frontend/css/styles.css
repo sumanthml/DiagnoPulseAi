@@ -53,7 +53,7 @@ body {
 }
 
 /* =============================================================================
-   FIREBASE AUTH MODAL OVERLAY
+   FIREBASE AUTH MODAL OVERLAY & ONSCREEN ALERT BANNER
    ============================================================================= */
 .auth-modal-overlay {
   position: fixed;
@@ -95,7 +95,7 @@ body {
 
 .auth-header {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .logo-icon-lg {
@@ -121,6 +121,21 @@ body {
 .auth-header p {
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+/* Onscreen Auth Error Alert Banner */
+.auth-error-alert {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.825rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: fadeIn 0.25s ease;
 }
 
 .auth-tabs {
@@ -181,7 +196,7 @@ body {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  padding: 0.3rem 0.6rem;
+  padding: 0.35rem 0.65rem;
   border-radius: 6px;
   font-size: 0.75rem;
   cursor: pointer;
@@ -355,7 +370,6 @@ body {
   gap: 1.25rem;
 }
 
-/* Role Pills */
 .role-pills {
   display: flex;
   gap: 0.35rem;
@@ -382,7 +396,6 @@ body {
   color: #fff;
 }
 
-/* User Profile Header Badge */
 .user-profile-menu {
   display: flex;
   align-items: center;
@@ -439,6 +452,128 @@ body {
 }
 
 /* =============================================================================
+   PATIENT DASHBOARD & PLAIN LANGUAGE EXPLAINER CARDS
+   ============================================================================= */
+.patient-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.5rem;
+}
+
+@media (max-width: 992px) {
+  .patient-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.patient-health-scorecard {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(58, 134, 255, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 18px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.scorecard-main {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.scorecard-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+}
+.scorecard-icon.green { background: rgba(16, 185, 129, 0.2); color: var(--status-normal); }
+.scorecard-icon.amber { background: rgba(245, 158, 11, 0.2); color: var(--status-low); }
+
+.scorecard-main h3 {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.scorecard-main p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.plain-language-guide-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.parameter-glossary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.glossary-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.glossary-item:hover {
+  background: rgba(58, 134, 255, 0.12);
+  border-color: var(--primary-blue);
+  transform: translateX(4px);
+}
+
+.glossary-item strong {
+  font-size: 0.85rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.glossary-item span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.plain-explainer-display {
+  background: rgba(11, 19, 43, 0.7);
+  border: 1px solid var(--primary-cyan);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-size: 0.825rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+  margin-top: 0.5rem;
+}
+
+.doctor-checklist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.825rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+.doctor-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+/* =============================================================================
    DASHBOARD CARDS & METRIC GAUGE METER
    ============================================================================= */
 .dashboard-view { display: none; }
@@ -475,37 +610,6 @@ body {
   padding: 1.5rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
-
-/* Analytics Stats Header */
-.analytics-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-box {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.3rem;
-}
-
-.stat-icon.blue { background: rgba(58, 134, 255, 0.15); color: var(--primary-blue); }
-.stat-icon.green { background: rgba(16, 185, 129, 0.15); color: var(--status-normal); }
-.stat-icon.purple { background: rgba(131, 56, 236, 0.15); color: var(--accent-purple); }
-
-.stat-label { font-size: 0.775rem; color: var(--text-muted); }
-.stat-val { font-size: 1.25rem; font-family: var(--font-heading); font-weight: 700; }
 
 /* Dynamic Range Meter Bar (Lab Tech Entry Live Gauge) */
 .metric-gauge-card {

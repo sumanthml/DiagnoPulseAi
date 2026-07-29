@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Diagnostics - Capstone Lab Management System</title>
+  <title>Smart Diagnostics - Patient-Centric AI Medical System</title>
 
   <!-- Google Fonts & FontAwesome 6 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,7 +14,7 @@
   <!-- Chart.js for Medical Analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Firebase Web SDK (v10 Compat for browser stability) -->
+  <!-- Firebase Web SDK (v10 Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
@@ -29,7 +29,12 @@
       <div class="auth-header">
         <div class="logo-icon-lg"><i class="fa-solid fa-microscope"></i></div>
         <h2>Smart Diagnostics</h2>
-        <p>Enterprise Diagnostic Interpretation Platform</p>
+        <p>Enterprise Diagnostic & Plain-Language Medical System</p>
+      </div>
+
+      <!-- Onscreen Error Alert Box -->
+      <div class="auth-error-alert" id="authErrorAlert" style="display:none;">
+        <i class="fa-solid fa-circle-exclamation"></i> <span id="authErrorMsg">Error message goes here</span>
       </div>
 
       <div class="auth-tabs">
@@ -41,19 +46,20 @@
       <form id="formLogin" class="auth-form active">
         <div class="form-group">
           <label><i class="fa-solid fa-envelope"></i> Email Address</label>
-          <input type="email" id="loginEmail" class="form-control" placeholder="john.doe@patient.com" value="john.doe@patient.com" required />
+          <input type="email" id="loginEmail" class="form-control" placeholder="your.name@example.com" required />
         </div>
         <div class="form-group">
           <label><i class="fa-solid fa-lock"></i> Password</label>
-          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" value="password123" required />
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required />
         </div>
         <button type="submit" class="btn btn-primary btn-block" id="btnLoginSubmit">
           <i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal
         </button>
+        
         <div class="quick-demo-accounts">
-          <span>Quick Demo One-Click Sign-In:</span>
+          <span>Quick One-Click Persona Login:</span>
           <div class="demo-buttons">
-            <button type="button" class="btn-demo" onclick="app.demoQuickLogin('PATIENT')">Patient</button>
+            <button type="button" class="btn-demo" onclick="app.demoQuickLogin('PATIENT')">Patient View</button>
             <button type="button" class="btn-demo" onclick="app.demoQuickLogin('LAB_TECHNICIAN')">Lab Tech</button>
             <button type="button" class="btn-demo" onclick="app.demoQuickLogin('PATHOLOGIST')">Pathologist</button>
             <button type="button" class="btn-demo" onclick="app.demoQuickLogin('ADMIN')">Admin</button>
@@ -65,7 +71,7 @@
       <form id="formRegister" class="auth-form">
         <div class="form-group">
           <label><i class="fa-solid fa-user"></i> Full Name</label>
-          <input type="text" id="regFullName" class="form-control" placeholder="Dr. Jane Smith" required />
+          <input type="text" id="regFullName" class="form-control" placeholder="e.g. Sumanth Sunny" required />
         </div>
         <div class="form-group-row">
           <div class="form-group">
@@ -80,7 +86,7 @@
           <div class="form-group">
             <label><i class="fa-solid fa-cake-candles"></i> Age / Gender</label>
             <div style="display:flex; gap:0.5rem;">
-              <input type="number" id="regAge" class="form-control" placeholder="40" value="40" min="0" max="150" />
+              <input type="number" id="regAge" class="form-control" placeholder="30" value="30" min="0" max="150" />
               <select id="regGender" class="form-control">
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -90,7 +96,7 @@
         </div>
         <div class="form-group">
           <label><i class="fa-solid fa-envelope"></i> Email Address</label>
-          <input type="email" id="regEmail" class="form-control" placeholder="user@diagnopulse.com" required />
+          <input type="email" id="regEmail" class="form-control" placeholder="sumanthsunny172005@gmail.com" required />
         </div>
         <div class="form-group">
           <label><i class="fa-solid fa-lock"></i> Password</label>
@@ -112,13 +118,13 @@
         <div class="logo-icon"><i class="fa-solid fa-microscope"></i></div>
         <div class="brand-text">
           <h2>Smart Diagnostics</h2>
-          <span>Enterprise System</span>
+          <span>AI Health System</span>
         </div>
       </div>
 
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" data-view="PATIENT" id="navItemPatient">
-          <i class="fa-solid fa-notes-medical"></i> <span>Patient Portal</span>
+          <i class="fa-solid fa-heart-pulse"></i> <span>Patient Portal</span>
         </a>
         <a href="#" class="nav-item" data-view="LAB_TECHNICIAN" id="navItemTech">
           <i class="fa-solid fa-vial-circle-check"></i> <span>Lab Technician Entry</span>
@@ -133,10 +139,10 @@
 
       <div class="sidebar-footer">
         <div class="connection-status">
-          <span class="status-dot green"></span> Supabase Cloud Connected
+          <span class="status-dot green"></span> Supabase Database: Connected
         </div>
         <div class="connection-status">
-          <span class="status-dot blue"></span> Groq LLaMA 3.3 Active
+          <span class="status-dot blue"></span> Groq LLaMA 3.3: Active
         </div>
       </div>
     </aside>
@@ -147,7 +153,7 @@
       <header class="top-bar">
         <div class="top-search">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" placeholder="Search reports, patients, MRNs..." />
+          <input type="text" placeholder="Search parameters, reports, MRNs..." />
         </div>
 
         <div class="top-user-actions">
@@ -155,15 +161,15 @@
           <div class="role-pills">
             <button class="role-pill active" data-role="PATIENT" id="roleBtnPatient"><i class="fa-solid fa-user-injured"></i> Patient</button>
             <button class="role-pill" data-role="LAB_TECHNICIAN" id="roleBtnTech"><i class="fa-solid fa-vial"></i> Tech</button>
-            <button class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist"><i class="fa-solid fa-user-doctor"></i> Pathologist</button>
+            <button class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist"><i class="fa-solid fa-user-doctor"></i> Doctor</button>
             <button class="role-pill" data-role="ADMIN" id="roleBtnAdmin"><i class="fa-solid fa-shield-halved"></i> Admin</button>
           </div>
 
           <!-- User Profile & Sign Out -->
           <div class="user-profile-menu">
-            <div class="user-avatar" id="userAvatar">JD</div>
+            <div class="user-avatar" id="userAvatar">U</div>
             <div class="user-details">
-              <span class="user-name" id="userNameLabel">John Doe</span>
+              <span class="user-name" id="userNameLabel">Guest User</span>
               <span class="user-role-tag" id="userRoleTag">PATIENT</span>
             </div>
             <button class="btn-logout" title="Sign Out" onclick="app.handleSignOut()"><i class="fa-solid fa-right-from-bracket"></i></button>
@@ -174,54 +180,115 @@
       <!-- Dashboard Views Workspace -->
       <main class="workspace-content">
 
-        <!-- 1. PATIENT DASHBOARD VIEW -->
+        <!-- ========================================== -->
+        <!-- 1. PATIENT DASHBOARD VIEW                  -->
+        <!-- ========================================== -->
         <section class="dashboard-view active" id="viewPatient">
           <div class="view-header">
             <div>
-              <h2><i class="fa-solid fa-heart-pulse text-emerald"></i> Patient Diagnostic Health Portal</h2>
-              <p>View verified clinical findings, plain-language AI diagnostic insights, and download official PDF reports.</p>
+              <h2><i class="fa-solid fa-heart-pulse text-emerald"></i> My Medical Diagnostic Health Center</h2>
+              <p>Easy-to-understand plain-language medical breakdown, visual progress graphs, and downloadable PDF reports.</p>
             </div>
-            <button class="btn btn-secondary" onclick="app.loadPatientView()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            <button class="btn btn-secondary" onclick="app.loadPatientView()"><i class="fa-solid fa-rotate"></i> Refresh Feed</button>
           </div>
 
-          <!-- Analytics Chart & Stats Header -->
-          <div class="analytics-row">
-            <div class="glass-card stat-box">
-              <div class="stat-icon blue"><i class="fa-solid fa-file-waveform"></i></div>
+          <!-- Patient Health Summary Scorecard Banner -->
+          <div class="patient-health-scorecard" id="patientHealthScorecard">
+            <div class="scorecard-main">
+              <div class="scorecard-icon green" id="scorecardIcon"><i class="fa-solid fa-shield-heart"></i></div>
               <div>
-                <span class="stat-label">Total Completed Reports</span>
-                <h3 class="stat-val" id="patientStatTotal">1</h3>
-              </div>
-            </div>
-            <div class="glass-card stat-box">
-              <div class="stat-icon green"><i class="fa-solid fa-shield-check"></i></div>
-              <div>
-                <span class="stat-label">Verified Status</span>
-                <h3 class="stat-val text-emerald">Approved</h3>
-              </div>
-            </div>
-            <div class="glass-card stat-box">
-              <div class="stat-icon purple"><i class="fa-solid fa-brain"></i></div>
-              <div>
-                <span class="stat-label">AI Summary Engine</span>
-                <h3 class="stat-val text-blue">Groq LLaMA 3.3</h3>
+                <h3 id="scorecardTitle">Health Balance: Monitoring Active</h3>
+                <p id="scorecardDesc">Your diagnostic test results are processed using AI to translate numerical parameters into everyday plain language.</p>
               </div>
             </div>
           </div>
 
-          <!-- Reports Grid -->
-          <div class="reports-grid" id="patientReportsList">
-            <!-- Dynamically populated via JS -->
+          <!-- Patient Analytics & Plain Language Tabs -->
+          <div class="patient-dashboard-grid">
+            <!-- Left Side: Visual Chart Analytics & Patient Feed -->
+            <div style="display:flex; flex-direction:column; gap:1.25rem;">
+              
+              <!-- Chart Canvas Card -->
+              <div class="glass-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                  <h3 style="font-size:1.1rem; font-family:var(--font-heading);"><i class="fa-solid fa-chart-line text-blue"></i> Health Parameters Trend Graph</h3>
+                  <small class="text-muted">Normal ranges highlighted in green</small>
+                </div>
+                <div style="height: 220px; position: relative;">
+                  <canvas id="healthTrendChart"></canvas>
+                </div>
+              </div>
+
+              <!-- Reports Feed Header -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+                <h3 style="font-family:var(--font-heading); font-size:1.2rem;"><i class="fa-solid fa-file-medical text-emerald"></i> My Lab Reports</h3>
+              </div>
+
+              <div class="reports-grid" id="patientReportsList">
+                <!-- Dynamically populated via JS -->
+              </div>
+            </div>
+
+            <!-- Right Side: Universal Plain-Language Medical Dictionary Card -->
+            <div style="display:flex; flex-direction:column; gap:1.25rem;">
+              <div class="glass-card plain-language-guide-card">
+                <h3><i class="fa-solid fa-book-medical text-cyan"></i> Universal Plain-Language Guide</h3>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">
+                  Click any parameter below to see what it actually means for your body in plain everyday English:
+                </p>
+
+                <div class="parameter-glossary-list">
+                  <div class="glossary-item" onclick="app.explainParameter('Hemoglobin')">
+                    <strong><i class="fa-solid fa-droplet text-high"></i> Hemoglobin (Hb)</strong>
+                    <span>Oxygen carrier in blood</span>
+                  </div>
+                  <div class="glossary-item" onclick="app.explainParameter('Total Cholesterol')">
+                    <strong><i class="fa-solid fa-heart text-low"></i> Cholesterol</strong>
+                    <span>Blood fats & heart health</span>
+                  </div>
+                  <div class="glossary-item" onclick="app.explainParameter('WBC')">
+                    <strong><i class="fa-solid fa-shield-virus text-emerald"></i> White Blood Cells (WBC)</strong>
+                    <span>Immune defense against infection</span>
+                  </div>
+                  <div class="glossary-item" onclick="app.explainParameter('Fasting Glucose')">
+                    <strong><i class="fa-solid fa-cubes-stacked text-purple"></i> Blood Sugar (Glucose)</strong>
+                    <span>Energy balance & diabetes risk</span>
+                  </div>
+                  <div class="glossary-item" onclick="app.explainParameter('TSH')">
+                    <strong><i class="fa-solid fa-bolt text-blue"></i> Thyroid (TSH)</strong>
+                    <span>Body metabolism control</span>
+                  </div>
+                </div>
+
+                <div class="plain-explainer-display" id="plainExplainerDisplay">
+                  <div class="ai-box-title"><i class="fa-solid fa-lightbulb"></i> Medical Plain Explainer</div>
+                  <p id="plainExplainerText">Select any parameter above to see a plain-language explanation tailored for anyone to understand.</p>
+                </div>
+              </div>
+
+              <!-- AI Lifestyle & Doctor Question Assistant Card -->
+              <div class="glass-card">
+                <h3><i class="fa-solid fa-user-doctor text-emerald"></i> Actionable Doctor Visit Checklist</h3>
+                <ul class="doctor-checklist" id="doctorChecklist">
+                  <li><i class="fa-solid fa-circle-check text-emerald"></i> Review your Hemoglobin levels with your physician.</li>
+                  <li><i class="fa-solid fa-circle-check text-emerald"></i> Ask if an iron-rich diet or dietary supplements are recommended.</li>
+                  <li><i class="fa-solid fa-circle-check text-emerald"></i> Schedule routine repeat blood work in 4-8 weeks to track progress.</li>
+                </ul>
+              </div>
+            </div>
+
           </div>
         </section>
 
 
-        <!-- 2. LAB TECHNICIAN DASHBOARD VIEW -->
+        <!-- ========================================== -->
+        <!-- 2. LAB TECHNICIAN DASHBOARD VIEW           -->
+        <!-- ========================================== -->
         <section class="dashboard-view" id="viewTech">
           <div class="view-header">
             <div>
-              <h2><i class="fa-solid fa-flask-vial text-blue"></i> Lab Technician Entry & Dynamic Evaluator</h2>
-              <p>Enter measured values with live visual range gauge indicators, trigger Groq AI summaries, and submit for Pathologist sign-off.</p>
+              <h2><i class="fa-solid fa-flask-vial text-blue"></i> Lab Technician Entry & Live Gauge Evaluator</h2>
+              <p>Select patient account, enter raw metrics with live visual range gauge bars, and request Groq AI summaries.</p>
             </div>
           </div>
 
@@ -259,7 +326,7 @@
               </form>
             </div>
 
-            <!-- Queue Card -->
+            <!-- Activity Queue Card -->
             <div class="glass-card queue-card">
               <h3><i class="fa-solid fa-clipboard-list"></i> Technician Activity Queue</h3>
               <div class="queue-list" id="techQueueList"></div>
@@ -268,7 +335,9 @@
         </section>
 
 
-        <!-- 3. PATHOLOGIST DASHBOARD VIEW -->
+        <!-- ========================================== -->
+        <!-- 3. PATHOLOGIST DASHBOARD VIEW              -->
+        <!-- ========================================== -->
         <section class="dashboard-view" id="viewPathologist">
           <div class="view-header">
             <div>
@@ -284,7 +353,9 @@
         </section>
 
 
-        <!-- 4. ADMIN DASHBOARD VIEW -->
+        <!-- ========================================== -->
+        <!-- 4. ADMIN DASHBOARD VIEW                    -->
+        <!-- ========================================== -->
         <section class="dashboard-view" id="viewAdmin">
           <div class="view-header">
             <div>

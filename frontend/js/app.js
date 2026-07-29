@@ -1,8 +1,8 @@
 /**
- * Smart Diagnostics - Application Controller (Firebase Auth & Live Gauge Engine)
+ * Smart Diagnostics - Application Controller
+ * Patient-Centric & Dynamic Auth Overhaul
  */
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAVWH58fyrMbiRK8kEsdDvqFs8qUI5O-kA",
   authDomain: "dagnoai.firebaseapp.com",
@@ -22,6 +22,41 @@ class AppController {
     this.technicians = [];
     this.pathologists = [];
     this.firebaseAuth = null;
+    this.healthChart = null;
+
+    // Plain-Language Explainer Dictionary
+    this.glossaryDict = {
+      "Hemoglobin": {
+        title: "Hemoglobin (Hb)",
+        meaning: "Carries oxygen from your lungs to the rest of your body.",
+        normal: "Normal Range: 13.8 – 17.2 g/dL (Men) / 12.1 – 15.1 g/dL (Women)",
+        whatItMeans: "If low: You may feel tired or short of breath (mild anemia). Iron-rich foods like spinach and lean meats help. If high: Blood may be thicker, often due to dehydration."
+      },
+      "Total Cholesterol": {
+        title: "Total Cholesterol",
+        meaning: "Measures blood fats essential for cell building and hormone production.",
+        normal: "Desirable Target: Below 200 mg/dL",
+        whatItMeans: "If elevated: Higher blood fat levels can build up in blood vessels. Exercise, reducing saturated fats, and staying active help maintain healthy levels."
+      },
+      "WBC": {
+        title: "White Blood Cells (WBC)",
+        meaning: "Your body's immune system defense forces that fight infections.",
+        normal: "Normal Range: 4.5 – 11.0 10^3/µL",
+        whatItMeans: "If elevated: Your immune system is actively fighting an infection or inflammation. If low: Immune defenses may be slightly weakened."
+      },
+      "Fasting Glucose": {
+        title: "Fasting Blood Sugar (Glucose)",
+        meaning: "Main source of energy for your body's cells derived from food.",
+        normal: "Normal Target: 70 – 99 mg/dL",
+        whatItMeans: "If elevated above 100 mg/dL: Indicates higher blood sugar levels. Staying hydrated and reducing refined sugars supports balanced glucose."
+      },
+      "TSH": {
+        title: "Thyroid Stimulating Hormone (TSH)",
+        meaning: "Controls your thyroid gland, regulating your body's energy & metabolism speed.",
+        normal: "Normal Range: 0.45 – 4.5 mIU/L",
+        whatItMeans: "If high: Your thyroid is underactive (sluggish metabolism). If low: Your thyroid is overactive (fast metabolism)."
+      }
+    };
 
     this.initFirebase();
     this.init();
@@ -32,14 +67,18 @@ class AppController {
       if (window.firebase && !firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
         this.firebaseAuth = firebase.auth();
-        console.log("Firebase Auth SDK initialized successfully.");
 
         this.firebaseAuth.onAuthStateChanged((user) => {
           if (user) {
-            console.log("Firebase Authenticated User:", user.email);
+            console.log("Firebase User Logged In:", user.email);
+            // Hydrate active user state
+            this.setLoggedInUser({
+              id: user.uid,
+              email: user.email,
+              full_name: user.displayName || user.email.split('@')[0],
+              role: this.activeRole
+            });
             document.getElementById("authModal").classList.remove("active");
-          } else {
-            console.log("No Firebase session. Showing Auth Modal.");
           }
         });
       }
@@ -50,12 +89,22 @@ class AppController {
 
   async init() {
     this.bindEvents();
+
+    // Check stored user session
+    const stored = localStorage.getItem("diagnopulse_user");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        this.setLoggedInUser(parsed);
+        document.getElementById("authModal").classList.remove("active");
+      } catch (e) {}
+    }
+
     await this.loadInitialData();
     this.setRole(this.activeRole);
   }
 
   bindEvents() {
-    // Role Pills Top Bar
     document.querySelectorAll(".role-pill").forEach(btn => {
       btn.addEventListener("click", (e) => {
         const role = e.currentTarget.dataset.role;
@@ -63,7 +112,6 @@ class AppController {
       });
     });
 
-    // Sidebar Nav Items
     document.querySelectorAll(".nav-item").forEach(item => {
       item.addEventListener("click", (e) => {
         e.preventDefault();
@@ -72,7 +120,6 @@ class AppController {
       });
     });
 
-    // Tech Form Select
     const templateSelect = document.getElementById("selectTemplate");
     if (templateSelect) {
       templateSelect.addEventListener("change", () => this.renderMetricInputs());
@@ -83,7 +130,6 @@ class AppController {
       techForm.addEventListener("submit", (e) => this.handleTechFormSubmit(e));
     }
 
-    // Auth Forms
     const loginForm = document.getElementById("formLogin");
     if (loginForm) {
       loginForm.addEventListener("submit", (e) => this.handleLogin(e));
@@ -96,15 +142,31 @@ class AppController {
   }
 
   switchAuthTab(tab) {
+    this.hideAuthError();
     document.getElementById("tabLogin").classList.toggle("active", tab === "login");
     document.getElementById("tabRegister").classList.toggle("active", tab === "register");
     document.getElementById("formLogin").classList.toggle("active", tab === "login");
     document.getElementById("formRegister").classList.toggle("active", tab === "register");
   }
 
+  showAuthError(message) {
+    const alertBox = document.getElementById("authErrorAlert");
+    const msgSpan = document.getElementById("authErrorMsg");
+    if (alertBox && msgSpan) {
+      msgSpan.textContent = message;
+      alertBox.style.display = "flex";
+    }
+  }
+
+  hideAuthError() {
+    const alertBox = document.getElementById("authErrorAlert");
+    if (alertBox) alertBox.style.display = "none";
+  }
+
   async handleLogin(e) {
     e.preventDefault();
-    const email = document.getElementById("loginEmail").value;
+    this.hideAuthError();
+    const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value;
     const btn = document.getElementById("btnLoginSubmit");
 
@@ -115,10 +177,31 @@ class AppController {
       if (this.firebaseAuth) {
         await this.firebaseAuth.signInWithEmailAndPassword(email, password);
       }
-      this.showToast("Signed in successfully via Firebase Auth!", "success");
+
+      // Check if user exists in database
+      const users = await window.api.getUsers();
+      let match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+      if (!match) {
+        // Auto-provision user record if first login
+        match = await window.api.createUser({
+          email: email,
+          full_name: email.split('@')[0].replace('.', ' '),
+          role: "PATIENT",
+          age: 30,
+          gender: "Male"
+        });
+      }
+
+      this.setLoggedInUser(match);
+      this.showToast(`Welcome back, ${match.full_name}!`, "success");
       document.getElementById("authModal").classList.remove("active");
     } catch (err) {
-      this.showToast(err.message || "Authentication failed.", "error");
+      let friendlyMsg = err.message || "Failed to sign in.";
+      if (friendlyMsg.includes("user-not-found") || friendlyMsg.includes("invalid-credential")) {
+        friendlyMsg = "Account not found or password incorrect. Click 'Register Account' below to sign up!";
+      }
+      this.showAuthError(friendlyMsg);
     } finally {
       btn.disabled = false;
       btn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal`;
@@ -127,11 +210,12 @@ class AppController {
 
   async handleRegister(e) {
     e.preventDefault();
-    const fullName = document.getElementById("regFullName").value;
+    this.hideAuthError();
+    const fullName = document.getElementById("regFullName").value.trim();
     const role = document.getElementById("regRole").value;
     const age = parseInt(document.getElementById("regAge").value) || 30;
     const gender = document.getElementById("regGender").value;
-    const email = document.getElementById("regEmail").value;
+    const email = document.getElementById("regEmail").value.trim();
     const password = document.getElementById("regPassword").value;
     const btn = document.getElementById("btnRegisterSubmit");
 
@@ -143,8 +227,7 @@ class AppController {
         await this.firebaseAuth.createUserWithEmailAndPassword(email, password);
       }
 
-      // Sync user profile to Supabase database
-      await window.api.createUser({
+      const dbUser = await window.api.createUser({
         email: email,
         full_name: fullName,
         role: role,
@@ -152,12 +235,17 @@ class AppController {
         gender: gender
       });
 
-      this.showToast("Firebase Account created & synced to Supabase!", "success");
+      this.setLoggedInUser(dbUser);
+      this.showToast("Account created successfully!", "success");
       document.getElementById("authModal").classList.remove("active");
       await this.loadInitialData();
       this.setRole(role);
     } catch (err) {
-      this.showToast(err.message || "Registration failed.", "error");
+      let friendlyMsg = err.message || "Failed to register account.";
+      if (friendlyMsg.includes("email-already-in-use")) {
+        friendlyMsg = "This email is already registered. Click 'Sign In' tab to log in!";
+      }
+      this.showAuthError(friendlyMsg);
     } finally {
       btn.disabled = false;
       btn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Create Firebase Account`;
@@ -165,16 +253,36 @@ class AppController {
   }
 
   demoQuickLogin(role) {
-    this.setRole(role);
+    let mockUser = {
+      id: role === "PATIENT" ? "pat-101" : role === "LAB_TECHNICIAN" ? "tech-201" : role === "PATHOLOGIST" ? "path-301" : "admin-401",
+      full_name: role === "PATIENT" ? "John Doe" : role === "LAB_TECHNICIAN" ? "Alex Tech" : role === "PATHOLOGIST" ? "Dr. Eleanor Roberts, MD" : "System Admin",
+      email: `${role.toLowerCase()}@diagnopulse.com`,
+      role: role
+    };
+
+    this.setLoggedInUser(mockUser);
     document.getElementById("authModal").classList.remove("active");
-    this.showToast(`Logged in as Quick Demo Persona: ${role}`, "success");
+    this.showToast(`Logged in as Persona: ${mockUser.full_name}`, "success");
+  }
+
+  setLoggedInUser(user) {
+    this.activeUser = user;
+    this.activeRole = user.role || "PATIENT";
+    localStorage.setItem("diagnopulse_user", JSON.stringify(user));
+
+    const name = user.full_name || "User";
+    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+    document.getElementById("userNameLabel").textContent = name;
+    document.getElementById("userRoleTag").textContent = this.activeRole;
+    document.getElementById("userAvatar").textContent = initials;
   }
 
   handleSignOut() {
-    if (this.firebaseAuth) {
-      this.firebaseAuth.signOut();
-    }
+    if (this.firebaseAuth) this.firebaseAuth.signOut();
+    localStorage.removeItem("diagnopulse_user");
     document.getElementById("authModal").classList.add("active");
+    this.hideAuthError();
     this.showToast("Signed out of session.", "info");
   }
 
@@ -272,7 +380,6 @@ class AppController {
       `;
     }).join("");
 
-    // Initial calculation of gauges
     document.querySelectorAll(".metric-value-input").forEach(inp => this.updateLiveGauge(inp));
   }
 
@@ -287,7 +394,6 @@ class AppController {
 
     if (!gaugeEl || !badgeEl) return;
 
-    // Calculate percentage range position (clamp between 5% and 95%)
     let pct = 50;
     if (max > min) {
       pct = ((val - (min * 0.7)) / ((max * 1.3) - (min * 0.7))) * 100;
@@ -295,7 +401,6 @@ class AppController {
     }
     gaugeEl.style.left = `${pct}%`;
 
-    // Determine Live Severity Badge
     if (val < min) {
       badgeEl.className = "severity-pill LOW";
       badgeEl.textContent = "LOW";
@@ -311,23 +416,8 @@ class AppController {
   setRole(role) {
     this.activeRole = role;
 
-    // Update Role Pills & Sidebar Nav
     document.querySelectorAll(".role-pill").forEach(btn => btn.classList.toggle("active", btn.dataset.role === role));
     document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === role));
-
-    if (role === "PATIENT") {
-      this.activeUser = this.patients[0] || { full_name: "John Doe", mrn: "MRN-884920" };
-    } else if (role === "LAB_TECHNICIAN") {
-      this.activeUser = this.technicians[0] || { full_name: "Alex Tech", employee_id: "LT-4091" };
-    } else if (role === "PATHOLOGIST") {
-      this.activeUser = this.pathologists[0] || { full_name: "Dr. Eleanor Roberts, MD" };
-    } else {
-      this.activeUser = { full_name: "System Admin" };
-    }
-
-    document.getElementById("userNameLabel").textContent = this.activeUser.full_name;
-    document.getElementById("userRoleTag").textContent = role;
-    document.getElementById("userAvatar").textContent = this.activeUser.full_name.split(' ').map(n => n[0]).join('').substring(0,2);
 
     document.querySelectorAll(".dashboard-view").forEach(el => el.classList.remove("active"));
 
@@ -346,21 +436,26 @@ class AppController {
     }
   }
 
+  // --- 1. Patient View Controller ---
   async loadPatientView() {
     const container = document.getElementById("patientReportsList");
-    container.innerHTML = `<div class="glass-card"><i class="fa-solid fa-spinner fa-spin"></i> Loading verified reports...</div>`;
+    container.innerHTML = `<div class="glass-card"><i class="fa-solid fa-spinner fa-spin"></i> Fetching your verified diagnostic reports...</div>`;
 
     try {
-      const patientId = this.patients[0] ? this.patients[0].id : "pat-101";
+      const patientId = this.activeUser ? this.activeUser.id : "pat-101";
       const reports = await window.api.getReports(patientId, "APPROVED", "PATIENT");
 
-      document.getElementById("patientStatTotal").textContent = reports.length;
+      this.renderPatientHealthChart(reports);
 
       if (reports.length === 0) {
         container.innerHTML = `
-          <div class="glass-card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:2rem;">
-            <i class="fa-solid fa-folder-open" style="font-size:2.5rem; margin-bottom:0.5rem;"></i>
-            <p>No verified diagnostic reports available yet.</p>
+          <div class="glass-card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:2.5rem;">
+            <i class="fa-solid fa-folder-open" style="font-size:2.5rem; margin-bottom:0.75rem; color:var(--primary-cyan);"></i>
+            <h3>No Verified Reports Found For Your Account</h3>
+            <p style="font-size:0.85rem; margin-top:0.35rem;">When your clinic lab technician processes your test metrics, your plain-language report will appear here automatically!</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="app.setRole('LAB_TECHNICIAN')">
+              <i class="fa-solid fa-plus"></i> Switch to Lab Tech View to Create Test Report
+            </button>
           </div>
         `;
         return;
@@ -371,31 +466,89 @@ class AppController {
           <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
             <div>
               <div style="font-family:var(--font-heading); font-size:1.15rem; font-weight:700;">${r.test_type}</div>
-              <small class="text-muted"><i class="fa-regular fa-calendar"></i> ${r.created_at.split('T')[0]}</small>
+              <small class="text-muted"><i class="fa-regular fa-calendar"></i> Date: ${r.created_at.split('T')[0]}</small>
             </div>
             <span class="status-badge ${r.status}">${r.status}</span>
           </div>
 
           <div class="ai-highlight-box">
-            <div class="ai-box-title"><i class="fa-solid fa-brain"></i> AI Medical Interpretation Summary</div>
-            <p>${r.ai_summary ? r.ai_summary.substring(0, 180) + '...' : 'No AI summary.'}</p>
+            <div class="ai-box-title"><i class="fa-solid fa-brain"></i> AI Plain-Language Explanation</div>
+            <p style="font-size:0.825rem; line-height:1.45;">${r.ai_summary ? r.ai_summary.substring(0, 220) + '...' : 'No summary available.'}</p>
           </div>
 
           <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.5rem;">
-            <i class="fa-solid fa-signature text-emerald"></i> Pathologist: <strong>${r.approved_by_name || 'Dr. Eleanor Roberts, MD'}</strong>
+            <i class="fa-solid fa-signature text-emerald"></i> Reviewed by: <strong>${r.approved_by_name || 'Dr. Eleanor Roberts, MD'}</strong>
           </div>
 
           <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
-            <button class="btn btn-primary btn-sm" onclick="app.viewReportModal('${r.id}')"><i class="fa-solid fa-eye"></i> Details</button>
+            <button class="btn btn-primary btn-sm" onclick="app.viewReportModal('${r.id}')"><i class="fa-solid fa-eye"></i> Plain-Language Details</button>
             <a href="${window.api.getPdfUrl(r.id)}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download PDF</a>
           </div>
         </div>
       `).join("");
+
     } catch (err) {
       container.innerHTML = `<div class="glass-card text-high">${err.message}</div>`;
     }
   }
 
+  explainParameter(paramKey) {
+    const item = this.glossaryDict[paramKey];
+    const display = document.getElementById("plainExplainerDisplay");
+    if (!item || !display) return;
+
+    display.innerHTML = `
+      <div class="ai-box-title"><i class="fa-solid fa-lightbulb text-cyan"></i> ${item.title} Explained</div>
+      <p style="font-weight:600; color:#fff; margin-bottom:0.25rem;">What it does: ${item.meaning}</p>
+      <p style="font-size:0.775rem; color:var(--primary-cyan); margin-bottom:0.35rem;">${item.normal}</p>
+      <p style="font-size:0.8rem; color:var(--text-muted);">${item.whatItMeans}</p>
+    `;
+  }
+
+  renderPatientHealthChart(reports) {
+    const canvas = document.getElementById("healthTrendChart");
+    if (!canvas) return;
+
+    if (this.healthChart) this.healthChart.destroy();
+
+    const ctx = canvas.getContext("2d");
+    this.healthChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Jan', 'Mar', 'May', 'Jul', 'Current Test'],
+        datasets: [
+          {
+            label: 'Hemoglobin (g/dL)',
+            data: [13.2, 12.8, 12.0, 11.5, 11.2],
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: 'Target Normal Min (13.8 g/dL)',
+            data: [13.8, 13.8, 13.8, 13.8, 13.8],
+            borderColor: '#10b981',
+            borderDash: [5, 5],
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+        },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        }
+      }
+    });
+  }
+
+  // --- 2. Tech View Controller ---
   async loadTechView() {
     this.loadTechQueue();
   }
@@ -404,7 +557,7 @@ class AppController {
     e.preventDefault();
     const btn = document.getElementById("btnSubmitTechReport");
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Evaluating Ranges...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Evaluating Ranges & Groq AI...`;
 
     try {
       const patientId = document.getElementById("selectPatient").value;
@@ -457,7 +610,7 @@ class AppController {
             <span class="status-badge ${r.status}">${r.status}</span>
           </div>
           <div style="font-size:0.775rem; color:var(--text-muted);">
-            Patient: ${r.patient_name} (${r.patient_mrn})
+            Patient: ${r.patient_name} (${r.patient_mrn || 'MRN-884920'})
           </div>
           <div style="margin-top:0.5rem;">
             <button class="btn btn-secondary btn-sm" onclick="app.viewReportModal('${r.id}')"><i class="fa-solid fa-eye"></i> Details</button>
@@ -469,6 +622,7 @@ class AppController {
     }
   }
 
+  // --- 3. Pathologist View Controller ---
   async loadPathologistView() {
     const queue = document.getElementById("pathologistQueueList");
     const badge = document.getElementById("pendingCountBadge");
@@ -511,7 +665,7 @@ class AppController {
               <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted); margin-bottom:0.35rem; display:block;">
                 Pathologist Clinical Verification Notes
               </label>
-              <textarea class="form-control" id="notes_${r.id}" rows="4" placeholder="Enter clinical notes..."></textarea>
+              <textarea class="form-control" id="notes_${r.id}" rows="4" placeholder="Enter clinical observations..."></textarea>
             </div>
 
             <div style="display:flex; gap:0.75rem; margin-top:1rem;">
@@ -590,20 +744,20 @@ class AppController {
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:0.75rem;">
           <div>
             <h4 style="font-size:1.1rem; color:#fff;">${r.test_type}</h4>
-            <small class="text-muted">Patient: ${r.patient.full_name} | MRN: ${r.patient.mrn}</small>
+            <small class="text-muted">Patient: ${r.patient.full_name} | MRN: ${r.patient.mrn || 'MRN-884920'}</small>
           </div>
           <span class="status-badge ${r.status}">${r.status}</span>
         </div>
 
         <div style="margin-top:1rem;">
-          <strong style="font-size:0.85rem; color:var(--primary-cyan);">Measured Metrics & Range Flags:</strong>
+          <strong style="font-size:0.85rem; color:var(--primary-cyan);">Measured Parameters & Range Flags:</strong>
           <table class="data-table" style="margin-top:0.5rem;">
             <thead>
               <tr>
                 <th>Parameter</th>
                 <th>Result</th>
                 <th>Unit</th>
-                <th>Severity Flag</th>
+                <th>Status Flag</th>
               </tr>
             </thead>
             <tbody>
@@ -620,13 +774,13 @@ class AppController {
         </div>
 
         <div class="ai-highlight-box" style="margin-top:1rem;">
-          <div class="ai-box-title"><i class="fa-solid fa-brain"></i> AI Plain-Language Medical Interpretation Summary</div>
-          <p style="font-size:0.825rem; line-height:1.5;">${r.ai_summary || 'No AI summary generated.'}</p>
+          <div class="ai-box-title"><i class="fa-solid fa-brain"></i> Plain-Language AI Interpretation</div>
+          <p style="font-size:0.825rem; line-height:1.5;">${r.ai_summary || 'No summary available.'}</p>
         </div>
 
         ${r.pathologist_notes ? `
           <div style="background:rgba(255,255,255,0.03); padding:0.85rem; border-radius:10px; border:1px solid var(--border-color); margin-top:0.75rem;">
-            <strong style="font-size:0.8rem; color:var(--status-normal);"><i class="fa-solid fa-signature"></i> Pathologist Clinical Notes:</strong>
+            <strong style="font-size:0.8rem; color:var(--status-normal);"><i class="fa-solid fa-signature"></i> Pathologist Clinical Verification:</strong>
             <p style="font-size:0.825rem; color:var(--text-muted); margin-top:0.25rem;">${r.pathologist_notes}</p>
           </div>
         ` : ''}

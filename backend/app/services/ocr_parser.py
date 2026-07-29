@@ -26,7 +26,7 @@ class LabFileParser:
             "Fasting Glucose": [r"fasting\s*glucose\s*[:\-=]?\s*([\d\.]+)", r"blood\s*sugar\s*[:\-=]?\s*([\d\.]+)"],
             "ALT": [r"alt\s*[:\-=]?\s*([\d\.]+)"],
             "AST": [r"ast\s*[:\-=]?\s*([\d\.]+)"],
-            "Serum Creatinine": [r"creatinine\s*[:\-=]?\s*([\d\.]+)"].
+            "Serum Creatinine": [r"creatinine\s*[:\-=]?\s*([\d\.]+)"]
         }
 
         extracted = []

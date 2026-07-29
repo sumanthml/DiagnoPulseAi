@@ -1,7 +1,7 @@
 /**
  * Smart Diagnostics - REST API Client Module
  */
-const API_BASE = ""; // Relative path to FastAPI server
+const API_BASE = window.API_BASE || ""; // Production Render Backend API URL or relative origin
 
 class ApiService {
   async getUsers(role = null) {

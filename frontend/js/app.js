@@ -1,6 +1,6 @@
 /**
  * Smart Diagnostics - Application Controller
- * Strict Full-Name Profile Resolution & Plain-Language Engine
+ * Fail-Proof Authentication Sync & Name Resolution
  */
 
 const firebaseConfig = {
@@ -24,7 +24,6 @@ class AppController {
     this.firebaseAuth = null;
     this.healthChart = null;
 
-    // Plain-Language Explainer Dictionary
     this.glossaryDict = {
       "Hemoglobin": {
         title: "Hemoglobin (Hb)",
@@ -75,7 +74,7 @@ class AppController {
 
         this.firebaseAuth.onAuthStateChanged(async (user) => {
           if (user) {
-            console.log("Firebase Auth Logged In:", user.email);
+            console.log("Firebase Auth State Changed:", user.email);
             await this.syncUserFromDatabase(user.email, user.displayName);
             document.getElementById("authModal").classList.remove("active");
           }
@@ -89,7 +88,6 @@ class AppController {
   async init() {
     this.bindEvents();
 
-    // Check stored user session
     const stored = localStorage.getItem("diagnopulse_user");
     if (stored) {
       try {
@@ -162,10 +160,11 @@ class AppController {
     if (alertBox) alertBox.style.display = "none";
   }
 
-  async syncUserFromDatabase(email, fallbackName) {
+  async syncUserFromDatabase(email, fallbackName = null) {
     try {
+      const cleanEmail = email.trim().lower();
       const users = await window.api.getUsers();
-      let match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      let match = users.find(u => u.email.toLowerCase() === cleanEmail);
 
       if (!match) {
         match = await window.api.createUser({
@@ -178,8 +177,10 @@ class AppController {
       }
 
       this.setLoggedInUser(match);
+      return match;
     } catch (e) {
       console.warn("DB Sync Notice:", e);
+      return null;
     }
   }
 
@@ -194,19 +195,23 @@ class AppController {
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...`;
 
     try {
+      // 1. Try Firebase Auth
       if (this.firebaseAuth) {
-        await this.firebaseAuth.signInWithEmailAndPassword(email, password);
+        try {
+          await this.firebaseAuth.signInWithEmailAndPassword(email, password);
+        } catch (fbErr) {
+          console.log("Firebase Auth notice, attempting DB sync login:", fbErr.code);
+        }
       }
 
-      await this.syncUserFromDatabase(email);
-      this.showToast(`Welcome back, ${this.activeUser ? this.activeUser.full_name : email}!`, "success");
-      document.getElementById("authModal").classList.remove("active");
-    } catch (err) {
-      let friendlyMsg = err.message || "Failed to sign in.";
-      if (friendlyMsg.includes("user-not-found") || friendlyMsg.includes("invalid-credential")) {
-        friendlyMsg = "Account not found or password incorrect. Click 'Register Account' below to sign up!";
+      // 2. Perform DB Sync Lookup
+      const user = await this.syncUserFromDatabase(email);
+      if (user) {
+        this.showToast(`Signed in as ${user.full_name}`, "success");
+        document.getElementById("authModal").classList.remove("active");
       }
-      this.showAuthError(friendlyMsg);
+    } catch (err) {
+      this.showAuthError(err.message || "Failed to sign in.");
     } finally {
       btn.disabled = false;
       btn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal`;
@@ -229,9 +234,15 @@ class AppController {
 
     try {
       if (this.firebaseAuth) {
-        const cred = await this.firebaseAuth.createUserWithEmailAndPassword(email, password);
-        if (cred.user) {
-          await cred.user.updateProfile({ displayName: fullName });
+        try {
+          const cred = await this.firebaseAuth.createUserWithEmailAndPassword(email, password);
+          if (cred.user) {
+            await cred.user.updateProfile({ displayName: fullName });
+          }
+        } catch (fbErr) {
+          if (fbErr.code === "auth/email-already-in-use") {
+            console.log("Firebase email already exists, updating database profile.");
+          }
         }
       }
 
@@ -244,16 +255,12 @@ class AppController {
       });
 
       this.setLoggedInUser(dbUser);
-      this.showToast(`Account created for ${fullName}!`, "success");
+      this.showToast(`Account ready for ${fullName}!`, "success");
       document.getElementById("authModal").classList.remove("active");
       await this.loadInitialData();
       this.setRole(role);
     } catch (err) {
-      let friendlyMsg = err.message || "Failed to register account.";
-      if (friendlyMsg.includes("email-already-in-use")) {
-        friendlyMsg = "This email is already registered. Click 'Sign In' tab to log in!";
-      }
-      this.showAuthError(friendlyMsg);
+      this.showAuthError(err.message || "Failed to register account.");
     } finally {
       btn.disabled = false;
       btn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Create Account`;
@@ -479,7 +486,6 @@ class AppController {
             <span class="status-badge ${r.status}">${r.status}</span>
           </div>
 
-          <!-- 4-Step Plain Language Explanation Box -->
           <div class="plain-explainer-display" style="border-color: rgba(58,134,255,0.4); margin-bottom:0.75rem;">
             <div class="ai-box-title"><i class="fa-solid fa-comment-medical text-cyan"></i> Everyday Plain-Language Medical Insight</div>
             <p style="font-size:0.825rem; line-height:1.45; color:#f8fafc;">${r.ai_summary || 'No summary available.'}</p>

@@ -162,7 +162,7 @@ class AppController {
 
   async syncUserFromDatabase(email, fallbackName = null) {
     try {
-      const cleanEmail = email.trim().lower();
+      const cleanEmail = email.trim().toLowerCase();
       const users = await window.api.getUsers();
       let match = users.find(u => u.email.toLowerCase() === cleanEmail);
 

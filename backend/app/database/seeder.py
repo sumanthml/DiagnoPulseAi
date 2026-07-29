@@ -17,25 +17,38 @@ def seed_database():
     db: Session = SessionLocal()
 
     try:
-        # 1. Seed Users if not present
+        # 1. Update any existing legacy seed users (John Doe / Sarah Smith -> Sumanth Sunny)
+        pat1 = db.query(DBUser).filter(DBUser.id == "pat-101").first()
+        if pat1:
+            pat1.full_name = "Sumanth Sunny"
+            pat1.email = "sumanth.sunny@patient.com"
+            db.commit()
+
+        pat2 = db.query(DBUser).filter(DBUser.id == "pat-102").first()
+        if pat2:
+            pat2.full_name = "Alex Johnson"
+            pat2.email = "alex.johnson@patient.com"
+            db.commit()
+
+        # 2. Seed Users if table is empty
         if db.query(DBUser).count() == 0:
             print("Seeding initial platform users...")
             users = [
                 DBUser(
                     id="pat-101",
-                    email="john.doe@patient.com",
-                    full_name="John Doe",
+                    email="sumanth.sunny@patient.com",
+                    full_name="Sumanth Sunny",
                     role=UserRole.PATIENT.value,
-                    age=42,
+                    age=30,
                     gender="Male",
                     mrn="MRN-884920"
                 ),
                 DBUser(
                     id="pat-102",
-                    email="sarah.smith@patient.com",
-                    full_name="Sarah Smith",
+                    email="alex.johnson@patient.com",
+                    full_name="Alex Johnson",
                     role=UserRole.PATIENT.value,
-                    age=35,
+                    age=28,
                     gender="Female",
                     mrn="MRN-773104"
                 ),
@@ -63,11 +76,10 @@ def seed_database():
             db.add_all(users)
             db.commit()
 
-        # 2. Seed Test Templates if not present
+        # 3. Seed Test Templates if not present
         if db.query(DBTestTemplate).count() == 0:
             print("Seeding diagnostic test templates...")
 
-            # Complete Blood Count (CBC)
             cbc = DBTestTemplate(
                 id="tpl-cbc",
                 name="Complete Blood Count (CBC)",
@@ -82,7 +94,6 @@ def seed_database():
                 DBTemplateMetric(id="m-plt", template_id="tpl-cbc", metric_name="Platelets", unit="10^3/µL", ref_min=150.0, ref_max=450.0),
             ]
 
-            # Lipid Profile
             lipid = DBTestTemplate(
                 id="tpl-lipid",
                 name="Lipid Profile",
@@ -97,7 +108,6 @@ def seed_database():
                 DBTemplateMetric(id="m-trig", template_id="tpl-lipid", metric_name="Triglycerides", unit="mg/dL", ref_min=40.0, ref_max=150.0),
             ]
 
-            # Thyroid Profile
             thyroid = DBTestTemplate(
                 id="tpl-thyroid",
                 name="Thyroid Profile",
@@ -111,7 +121,6 @@ def seed_database():
                 DBTemplateMetric(id="m-ft4", template_id="tpl-thyroid", metric_name="Free T4", unit="ng/dL", ref_min=0.8, ref_max=1.8),
             ]
 
-            # Liver Function Test
             liver = DBTestTemplate(
                 id="tpl-liver",
                 name="Liver Function Test",
@@ -126,7 +135,6 @@ def seed_database():
                 DBTemplateMetric(id="m-alb", template_id="tpl-liver", metric_name="Albumin", unit="g/dL", ref_min=3.4, ref_max=5.4),
             ]
 
-            # Metabolic Panel
             metabolic = DBTestTemplate(
                 id="tpl-metabolic",
                 name="Metabolic Panel",
@@ -145,9 +153,9 @@ def seed_database():
             db.add_all(cbc_metrics + lipid_metrics + thyroid_metrics + liver_metrics + metabolic_metrics)
             db.commit()
 
-        # 3. Seed Sample Approved Report for John Doe if empty
+        # 4. Seed Sample Approved Report for Sumanth Sunny if empty
         if db.query(DBReport).count() == 0:
-            print("Seeding sample diagnostic report...")
+            print("Seeding sample diagnostic report for Sumanth Sunny...")
             sample_report_id = "rep-sample-01"
             sample_report = DBReport(
                 id=sample_report_id,
@@ -156,8 +164,8 @@ def seed_database():
                 approved_by_id="path-301",
                 test_type="Complete Blood Count (CBC)",
                 status=ReportStatus.APPROVED.value,
-                ai_summary="Clinical Summary: The Hemoglobin level is slightly reduced at 11.2 g/dL (reference: 13.8-17.2 g/dL), indicating mild normocytic anemia. WBC count is normal at 6.8 10^3/µL, and Platelet count is well-preserved at 280 10^3/µL. Recommendation: Correlate with serum iron studies and reticulocyte count.",
-                pathologist_notes="Verified mild anemia pattern. Agreed with AI summary recommendations. Recommended iron profile follow-up in 4 weeks."
+                ai_summary="Clinical Summary: The Hemoglobin level is slightly reduced at 11.2 g/dL (reference: 13.8-17.2 g/dL), indicating mild normocytic anemia. WBC count is normal at 6.8 10^3/µL, and Platelet count is well-preserved at 280 10^3/µL.",
+                pathologist_notes="Verified diagnostic report for Sumanth Sunny."
             )
 
             metrics = [
@@ -167,18 +175,8 @@ def seed_database():
                 DBReportMetric(id=str(uuid.uuid4()), report_id=sample_report_id, metric_name="Platelets", value=280.0, unit="10^3/µL", severity="NORMAL", message="Within reference limits")
             ]
 
-            audit = DBAuditLog(
-                id=str(uuid.uuid4()),
-                user_id="path-301",
-                action="APPROVE_REPORT",
-                entity_type="REPORT",
-                entity_id=sample_report_id,
-                details="Pathologist approved CBC diagnostic report with clinical notes."
-            )
-
             db.add(sample_report)
             db.add_all(metrics)
-            db.add(audit)
             db.commit()
 
         print("Database seeding completed successfully.")

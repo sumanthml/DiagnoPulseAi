@@ -1,6 +1,6 @@
 /**
  * Smart Diagnostics - Application Controller
- * Fail-Proof Authentication Sync & Name Resolution
+ * Fail-Proof Authentication Sync & Rich Sub-Division Navigation
  */
 
 const firebaseConfig = {
@@ -111,9 +111,10 @@ class AppController {
 
     document.querySelectorAll(".nav-item").forEach(item => {
       item.addEventListener("click", (e) => {
-        e.preventDefault();
         const view = e.currentTarget.dataset.view;
-        this.setRole(view);
+        if (view) {
+          this.setRole(view);
+        }
       });
     });
 
@@ -195,7 +196,6 @@ class AppController {
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...`;
 
     try {
-      // 1. Try Firebase Auth
       if (this.firebaseAuth) {
         try {
           await this.firebaseAuth.signInWithEmailAndPassword(email, password);
@@ -204,7 +204,6 @@ class AppController {
         }
       }
 
-      // 2. Perform DB Sync Lookup
       const user = await this.syncUserFromDatabase(email);
       if (user) {
         this.showToast(`Signed in as ${user.full_name}`, "success");
@@ -451,6 +450,43 @@ class AppController {
     }
   }
 
+  scrollPatientTo(sectionId) {
+    this.setRole('PATIENT');
+    const el = sectionId === 'reports' ? document.getElementById('patientReportsHeader') : document.getElementById('plainExplainerSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async generateSampleReportForPatient() {
+    if (!this.activeUser) return;
+    this.showToast("Generating 4-step plain-language test report...", "info");
+
+    try {
+      const techId = this.technicians[0] ? this.technicians[0].id : "tech-201";
+      const pathId = this.pathologists[0] ? this.pathologists[0].id : "path-301";
+
+      const res = await window.api.createReportDraft({
+        patient_id: this.activeUser.id,
+        technician_id: techId,
+        test_type: "Complete Blood Count (CBC)",
+        metrics: [
+          { name: "Hemoglobin", value: 11.2, unit: "g/dL" },
+          { name: "WBC", value: 6.8, unit: "10^3/µL" },
+          { name: "RBC", value: 4.1, unit: "10^6/µL" },
+          { name: "Platelets", value: 280.0, unit: "10^3/µL" }
+        ]
+      });
+
+      await window.api.generateAiSummary(res.report_id);
+      await window.api.submitForApproval(res.report_id);
+      await window.api.approveReport(res.report_id, pathId, "Verified CBC metric boundaries. Recommended iron supplementation diet.");
+
+      this.showToast(`Sample report generated for ${this.activeUser.full_name}!`, "success");
+      this.loadPatientView();
+    } catch (err) {
+      this.showToast(err.message, "error");
+    }
+  }
+
   // --- 1. Patient View Controller ---
   async loadPatientView() {
     const container = document.getElementById("patientReportsList");
@@ -463,14 +499,20 @@ class AppController {
       this.renderPatientHealthChart(reports);
 
       if (reports.length === 0) {
+        const name = this.activeUser ? this.activeUser.full_name : 'Your Account';
         container.innerHTML = `
           <div class="glass-card" style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:2.5rem;">
             <i class="fa-solid fa-folder-open" style="font-size:2.5rem; margin-bottom:0.75rem; color:var(--primary-cyan);"></i>
-            <h3>No Verified Reports Found For ${this.activeUser ? this.activeUser.full_name : 'Your Account'}</h3>
-            <p style="font-size:0.85rem; margin-top:0.35rem;">When your clinic processes your lab metrics, your plain-language report will appear here automatically!</p>
-            <button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="app.setRole('LAB_TECHNICIAN')">
-              <i class="fa-solid fa-plus"></i> Switch to Lab Tech View to Create Test Entry
-            </button>
+            <h3>No Verified Reports Found For ${name}</h3>
+            <p style="font-size:0.85rem; margin-top:0.35rem;">Click the button below to generate an instant 4-step plain-language sample report for your account!</p>
+            <div style="display:flex; justify-content:center; gap:0.75rem; margin-top:1.25rem; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="app.generateSampleReportForPatient()">
+                <i class="fa-solid fa-bolt text-cyan"></i> Generate Sample Test Report for ${name}
+              </button>
+              <button class="btn btn-secondary" onclick="app.setRole('LAB_TECHNICIAN')">
+                <i class="fa-solid fa-vial"></i> Switch to Lab Tech View
+              </button>
+            </div>
           </div>
         `;
         return;

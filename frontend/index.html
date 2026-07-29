@@ -112,7 +112,7 @@
 
   <!-- Main App Layout Shell -->
   <div class="app-layout">
-    <!-- Left Navigation Sidebar -->
+    <!-- Left Navigation Sidebar with Sub-Divisions -->
     <aside class="app-sidebar">
       <div class="sidebar-brand">
         <div class="logo-icon"><i class="fa-solid fa-heart-pulse"></i></div>
@@ -123,17 +123,37 @@
       </div>
 
       <nav class="sidebar-nav">
+        <!-- 1. Patient Health Center Section -->
+        <div class="nav-category-header"><i class="fa-solid fa-user-heart"></i> Patient Health</div>
         <a href="#" class="nav-item active" data-view="PATIENT" id="navItemPatient">
-          <i class="fa-solid fa-user-heart"></i> <span>My Health Dashboard</span>
+          <i class="fa-solid fa-house-medical"></i> <span>My Health Dashboard</span>
         </a>
+        <a href="#" class="nav-item nav-sub-item" data-view="PATIENT" onclick="app.scrollPatientTo('reports')">
+          <i class="fa-solid fa-file-medical"></i> <span>My Medical Reports</span>
+        </a>
+        <a href="#" class="nav-item nav-sub-item" data-view="PATIENT" onclick="app.scrollPatientTo('explainer')">
+          <i class="fa-solid fa-lightbulb"></i> <span>Plain English Guide</span>
+        </a>
+
+        <!-- 2. Lab Operations Section -->
+        <div class="nav-category-header"><i class="fa-solid fa-vial"></i> Lab Operations</div>
         <a href="#" class="nav-item" data-view="LAB_TECHNICIAN" id="navItemTech">
           <i class="fa-solid fa-vial-circle-check"></i> <span>Lab Technician Entry</span>
         </a>
+        <a href="#" class="nav-item nav-sub-item" data-view="LAB_TECHNICIAN">
+          <i class="fa-solid fa-sliders"></i> <span>Range Gauge Meter</span>
+        </a>
+
+        <!-- 3. Doctor Review Section -->
+        <div class="nav-category-header"><i class="fa-solid fa-user-doctor"></i> Clinical Doctor</div>
         <a href="#" class="nav-item" data-view="PATHOLOGIST" id="navItemPathologist">
           <i class="fa-solid fa-user-doctor"></i> <span>Doctor Review Queue</span>
         </a>
+
+        <!-- 4. System Admin Section -->
+        <div class="nav-category-header"><i class="fa-solid fa-shield-halved"></i> Platform Admin</div>
         <a href="#" class="nav-item" data-view="ADMIN" id="navItemAdmin">
-          <i class="fa-solid fa-shield-halved"></i> <span>Admin Audit Logs</span>
+          <i class="fa-solid fa-clock-rotate-left"></i> <span>Admin Audit Logs</span>
         </a>
       </nav>
 
@@ -221,7 +241,7 @@
               </div>
 
               <!-- Reports List Header -->
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;" id="patientReportsHeader">
                 <h3 style="font-family:var(--font-heading); font-size:1.2rem;"><i class="fa-solid fa-file-medical text-emerald"></i> My Medical Reports</h3>
               </div>
 
@@ -232,7 +252,7 @@
 
             <!-- Right Side: Plain English Medical Dictionary & Doctor Checklist -->
             <div style="display:flex; flex-direction:column; gap:1.25rem;">
-              <div class="glass-card plain-language-guide-card">
+              <div class="glass-card plain-language-guide-card" id="plainExplainerSection">
                 <h3><i class="fa-solid fa-lightbulb text-cyan"></i> Everyday Plain-English Medical Explainer</h3>
                 <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
                   Click any parameter below to see what it means for your health in simple words:

@@ -181,7 +181,7 @@
       <header class="top-bar">
         <div class="top-search">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" placeholder="Search lab tests..." />
+          <input type="text" id="topSearchInput" placeholder="Search lab tests or metrics..." oninput="app.handleLiveSearch(this.value)" />
         </div>
 
         <div class="top-user-actions">

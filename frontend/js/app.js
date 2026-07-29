@@ -600,6 +600,28 @@ class AppController {
     }
   }
 
+  handleLiveSearch(query) {
+    const q = (query || "").toLowerCase().trim();
+    
+    // 1. Filter Patient Reports
+    document.querySelectorAll("#patientReportsList .glass-card").forEach(card => {
+      const text = card.textContent.toLowerCase();
+      card.style.display = (!q || text.includes(q)) ? "block" : "none";
+    });
+
+    // 2. Filter Pathologist Queue Cards
+    document.querySelectorAll("#pathologistQueueList .glass-card").forEach(card => {
+      const text = card.textContent.toLowerCase();
+      card.style.display = (!q || text.includes(q)) ? "block" : "none";
+    });
+
+    // 3. Filter Audit Log Rows
+    document.querySelectorAll("#adminAuditLogTable tr").forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = (!q || text.includes(q)) ? "" : "none";
+    });
+  }
+
   explainParameter(paramKey) {
     const item = this.glossaryDict[paramKey];
     const display = document.getElementById("plainExplainerDisplay");
@@ -607,10 +629,10 @@ class AppController {
 
     display.innerHTML = `
       <div class="ai-box-title"><i class="fa-solid fa-lightbulb text-cyan"></i> ${item.title} Explained</div>
-      <p style="font-weight:600; color:#fff; margin-bottom:0.25rem;">1. Body Function: ${item.meaning}</p>
-      <p style="font-size:0.775rem; color:var(--primary-cyan); margin-bottom:0.35rem;">2. Safe Target: ${item.normal}</p>
-      <p style="font-size:0.8rem; color:#cbd5e1; margin-bottom:0.35rem;">3. What It Means: ${item.whatItMeans}</p>
-      <p style="font-size:0.8rem; color:var(--status-normal); font-weight:600;">4. Simple Advice: ${item.simpleAdvice}</p>
+      <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:0.85rem; margin-top:0.5rem; font-size:0.875rem; line-height:1.5;">
+        <p style="color:#ffffff; margin-bottom:0.5rem;"><i class="fa-solid fa-circle-info text-cyan"></i> <strong>What it is:</strong> ${item.meaning}</p>
+        <p style="color:var(--status-normal); font-weight:500;"><i class="fa-solid fa-circle-check text-emerald"></i> <strong>Simple Advice:</strong> ${item.simpleAdvice}</p>
+      </div>
     `;
   }
 

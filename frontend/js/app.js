@@ -201,9 +201,11 @@ class AppController {
 
       const user = await this.syncUserFromDatabase(email);
       if (user) {
-        this.showToast(`Signed in as ${user.full_name}`, "success");
+        this.showToast(`Signed in as ${user.full_name} (${user.role.replace('_', ' ')})`, "success");
         document.getElementById("authModal").classList.remove("active");
         await this.loadInitialData();
+        // Lock portal to user's actual database role
+        this.setRole(user.role);
       }
     } catch (err) {
       this.showAuthError(err.message || "Failed to sign in.");
@@ -263,37 +265,35 @@ class AppController {
   }
 
   demoQuickLogin(role) {
-    this.switchPersonaRole(role);
-    document.getElementById("authModal").classList.remove("active");
-  }
-
-  switchPersonaRole(role) {
-    let mockUser;
+    // Demo quick-login: authenticates as the seeded user for that role
+    // and locks the entire portal to that role only (no switching)
+    let demoUser;
     if (role === "PATIENT") {
-      const stored = localStorage.getItem("diagnopulse_user");
-      mockUser = stored ? JSON.parse(stored) : {
+      demoUser = {
         id: "pat-101",
-        full_name: "John Doe",
-        email: "patient@diagnopulse.com",
-        role: "PATIENT"
+        full_name: "Sumanth Sunny",
+        email: "sumanth.sunny@patient.com",
+        role: "PATIENT",
+        mrn: "MRN-884920"
       };
-      mockUser.role = "PATIENT";
     } else if (role === "LAB_TECHNICIAN") {
-      mockUser = {
+      demoUser = {
         id: this.technicians[0] ? this.technicians[0].id : "tech-201",
-        full_name: this.technicians[0] ? this.technicians[0].full_name : "Alex Tech",
-        email: "tech@diagnopulse.com",
-        role: "LAB_TECHNICIAN"
+        full_name: this.technicians[0] ? this.technicians[0].full_name : "Alex Tech (Lab Tech)",
+        email: "alex.tech@diagnopulse.com",
+        role: "LAB_TECHNICIAN",
+        employee_id: "LT-4091"
       };
     } else if (role === "PATHOLOGIST") {
-      mockUser = {
+      demoUser = {
         id: this.pathologists[0] ? this.pathologists[0].id : "path-301",
         full_name: this.pathologists[0] ? this.pathologists[0].full_name : "Dr. Eleanor Roberts, MD",
-        email: "doctor@diagnopulse.com",
-        role: "PATHOLOGIST"
+        email: "dr.roberts@diagnopulse.com",
+        role: "PATHOLOGIST",
+        license_number: "MD-PATH-99302"
       };
     } else {
-      mockUser = {
+      demoUser = {
         id: "admin-401",
         full_name: "System Admin",
         email: "admin@diagnopulse.com",
@@ -301,10 +301,20 @@ class AppController {
       };
     }
 
-    this.setLoggedInUser(mockUser);
-    this.setRole(role);
-    this.showToast(`Switched Persona to ${mockUser.full_name} (${role})`, "info");
+    this.setLoggedInUser(demoUser);
+    this.setRole(demoUser.role);
+    document.getElementById("authModal").classList.remove("active");
+    this.showToast(`Logged in as ${demoUser.full_name} (${demoUser.role.replace('_', ' ')})`, "success");
   }
+
+
+  // switchPersonaRole is now DEPRECATED for top-bar use.
+  // Role is always determined by logged-in user's database role.
+  // Only kept for internal migration compatibility.
+  switchPersonaRole(role) {
+    console.warn("switchPersonaRole() called — use demoQuickLogin() instead.");
+  }
+
 
   setLoggedInUser(user) {
     this.activeUser = user;
@@ -315,8 +325,17 @@ class AppController {
     const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
     document.getElementById("userNameLabel").textContent = name;
-    document.getElementById("userRoleTag").textContent = this.activeRole;
+    document.getElementById("userRoleTag").textContent = this.activeRole.replace('_', ' ');
     document.getElementById("userAvatar").textContent = initials;
+
+    // LOCK: Show role indicator bar (read-only) and highlight the correct pill
+    const pillsBar = document.querySelector(".role-pills");
+    if (pillsBar) {
+      pillsBar.style.display = "flex";
+      document.querySelectorAll(".role-pill").forEach(pill => {
+        pill.classList.toggle("active", pill.dataset.role === this.activeRole);
+      });
+    }
 
     this.applyRoleBasedNavigation();
   }
@@ -324,21 +343,40 @@ class AppController {
   applyRoleBasedNavigation() {
     const userRole = this.activeUser ? this.activeUser.role : "PATIENT";
 
-    // Filter sidebar navigation blocks based on data-role-group
+    // Show/hide sidebar nav blocks based on user's actual role
     document.querySelectorAll(".nav-category-block").forEach(block => {
       const allowedRoles = block.dataset.roleGroup ? block.dataset.roleGroup.split(",") : ["ADMIN"];
-      if (allowedRoles.includes(userRole) || userRole === "ADMIN") {
-        block.style.display = "block";
-      } else {
-        block.style.display = "none";
-      }
+      block.style.display = (allowedRoles.includes(userRole) || userRole === "ADMIN") ? "block" : "none";
     });
 
-    // Update top role pills active highlight
-    document.querySelectorAll(".role-pill").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.role === userRole);
+    // Lock ALL nav items so only the current user's role views are clickable
+    document.querySelectorAll(".nav-item[data-view]").forEach(item => {
+      const itemView = item.dataset.view;
+      const isOwnRole = itemView === userRole;
+      const isSubItem = item.classList.contains("nav-sub-item"); // sub-items are allowed for own role
+
+      // Determine if this nav item belongs to the logged-in user's role
+      const roleMapping = {
+        "PATIENT": "PATIENT",
+        "LAB_TECHNICIAN": "LAB_TECHNICIAN",
+        "PATHOLOGIST": "PATHOLOGIST",
+        "ADMIN": "ADMIN"
+      };
+
+      if (userRole === "ADMIN") {
+        // Admin can see everything — their own view is viewAdmin
+        item.style.pointerEvents = "";
+        item.style.opacity = "";
+      } else {
+        // Non-admin: only their own role view is accessible
+        const allowed = itemView === userRole;
+        item.style.pointerEvents = allowed ? "" : "none";
+        item.style.opacity = allowed ? "" : "0.35";
+        if (!allowed) item.title = `Sign in as ${itemView.replace('_', ' ')} to access this section`;
+      }
     });
   }
+
 
   handleSignOut() {
     if (this.firebaseAuth) this.firebaseAuth.signOut();

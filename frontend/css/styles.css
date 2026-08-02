@@ -415,6 +415,13 @@ body {
   color: #fff;
 }
 
+/* Role pills are now READ-ONLY role indicators — not clickable switchers */
+.role-pill {
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
 .user-profile-menu {
   display: flex;
   align-items: center;

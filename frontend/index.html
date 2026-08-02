@@ -194,11 +194,12 @@
 
         <div class="top-user-actions">
           <!-- Role Persona Switcher Quick Pills -->
-          <div class="role-pills">
-            <button class="role-pill active" data-role="PATIENT" id="roleBtnPatient" onclick="app.switchPersonaRole('PATIENT')"><i class="fa-solid fa-user-injured"></i> Patient</button>
-            <button class="role-pill" data-role="LAB_TECHNICIAN" id="roleBtnTech" onclick="app.switchPersonaRole('LAB_TECHNICIAN')"><i class="fa-solid fa-vial"></i> Tech</button>
-            <button class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist" onclick="app.switchPersonaRole('PATHOLOGIST')"><i class="fa-solid fa-user-doctor"></i> Doctor</button>
-            <button class="role-pill" data-role="ADMIN" id="roleBtnAdmin" onclick="app.switchPersonaRole('ADMIN')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
+          <!-- Role indicator — shows active role only, NOT a switcher -->
+          <div class="role-pills" id="roleIndicatorBar" style="display:none;">
+            <span class="role-pill active" id="roleBtnPatient" data-role="PATIENT"><i class="fa-solid fa-user-injured"></i> Patient</span>
+            <span class="role-pill" data-role="LAB_TECHNICIAN" id="roleBtnTech"><i class="fa-solid fa-vial"></i> Tech</span>
+            <span class="role-pill" data-role="PATHOLOGIST" id="roleBtnPathologist"><i class="fa-solid fa-user-doctor"></i> Doctor</span>
+            <span class="role-pill" data-role="ADMIN" id="roleBtnAdmin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
           </div>
 
           <!-- User Profile & Sign Out -->

@@ -77,7 +77,10 @@ class AppController {
         this.firebaseAuth.onAuthStateChanged(async (user) => {
           if (user) {
             console.log("Firebase Auth State Changed:", user.email);
-            await this.syncUserFromDatabase(user.email, user.displayName);
+            const dbUser = await this.syncUserFromDatabase(user.email, user.displayName);
+            if (dbUser) {
+              this.setRole(dbUser.role);
+            }
             document.getElementById("authModal").classList.remove("active");
           }
         });
@@ -265,6 +268,11 @@ class AppController {
   }
 
   demoQuickLogin(role) {
+    // Clear Firebase session to prevent it from auto-syncing/overwriting the demo user on reload
+    if (this.firebaseAuth && this.firebaseAuth.currentUser) {
+      this.firebaseAuth.signOut().catch(err => console.log("Firebase signout error:", err));
+    }
+
     // Demo quick-login: authenticates as the seeded user for that role
     // and locks the entire portal to that role only (no switching)
     let demoUser;
@@ -379,8 +387,25 @@ class AppController {
 
 
   handleSignOut() {
-    if (this.firebaseAuth) this.firebaseAuth.signOut();
+    if (this.firebaseAuth) {
+      this.firebaseAuth.signOut().catch(err => console.log("Firebase signout error:", err));
+    }
     localStorage.removeItem("diagnopulse_user");
+    this.activeUser = null;
+    this.activeRole = "PATIENT";
+
+    // Reset view to Patient dashboard defaults
+    this.setRole("PATIENT");
+
+    // Clear user profile details in top-right menu
+    document.getElementById("userNameLabel").textContent = "Guest User";
+    document.getElementById("userRoleTag").textContent = "PATIENT";
+    document.getElementById("userAvatar").textContent = "U";
+
+    // Hide role indicator bar
+    const pillsBar = document.querySelector(".role-pills");
+    if (pillsBar) pillsBar.style.display = "none";
+
     document.getElementById("authModal").classList.add("active");
     this.hideAuthError();
     this.showToast("Signed out of session.", "info");

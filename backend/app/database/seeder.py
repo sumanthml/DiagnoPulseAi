@@ -149,8 +149,23 @@ def seed_database():
                 DBTemplateMetric(id="m-k", template_id="tpl-metabolic", metric_name="Potassium", unit="mEq/L", ref_min=3.5, ref_max=5.0),
             ]
 
-            db.add_all([cbc, lipid, thyroid, liver, metabolic])
-            db.add_all(cbc_metrics + lipid_metrics + thyroid_metrics + liver_metrics + metabolic_metrics)
+            urine = DBTestTemplate(
+                id="tpl-urine",
+                name="Urinalysis",
+                code="URN-006",
+                category="Nephrology / Biochemistry",
+                description="Routine urine examination assessing kidney function, infection markers, and metabolic waste."
+            )
+            urine_metrics = [
+                DBTemplateMetric(id="m-uph", template_id="tpl-urine", metric_name="Urine pH", unit="pH", ref_min=4.5, ref_max=8.0),
+                DBTemplateMetric(id="m-usg", template_id="tpl-urine", metric_name="Specific Gravity", unit="SG", ref_min=1.005, ref_max=1.030),
+                DBTemplateMetric(id="m-upro", template_id="tpl-urine", metric_name="Protein (Urine)", unit="mg/dL", ref_min=0.0, ref_max=14.0),
+                DBTemplateMetric(id="m-uglu", template_id="tpl-urine", metric_name="Glucose (Urine)", unit="mg/dL", ref_min=0.0, ref_max=15.0),
+                DBTemplateMetric(id="m-uwbc", template_id="tpl-urine", metric_name="WBC (Urine)", unit="cells/\u00b5L", ref_min=0.0, ref_max=5.0),
+            ]
+
+            db.add_all([cbc, lipid, thyroid, liver, metabolic, urine])
+            db.add_all(cbc_metrics + lipid_metrics + thyroid_metrics + liver_metrics + metabolic_metrics + urine_metrics)
             db.commit()
 
         # 4. Seed Sample Approved Report for Sumanth Sunny if empty

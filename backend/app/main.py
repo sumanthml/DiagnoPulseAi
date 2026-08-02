@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from app.database.connection import engine, Base
 from app.database.seeder import seed_database
-from app.routers import auth, reports, tests, audit
+from app.routers import auth, reports, tests, audit, admin
 
 app = FastAPI(
     title="Smart Diagnostics: Lab Report & Test Management System",
@@ -20,10 +20,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS Configuration
+# CORS Configuration — allows frontend (Vercel) + local dev
+# In production, restrict to your deployed frontend domain via ALLOWED_ORIGINS env var
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "*"  # Default: open for local dev. Set to specific URL in production.
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +47,7 @@ app.include_router(auth.router)
 app.include_router(reports.router)
 app.include_router(tests.router)
 app.include_router(audit.router)
+app.include_router(admin.router)
 
 # Mount Frontend Static Directory
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend"))

@@ -1,9 +1,28 @@
 """
 Smart Diagnostics - Domain Models (Core OOP Architecture)
-Demonstrates:
-- Encapsulation: Private properties with getters/setters and range boundaries validation.
-- Inheritance: Base User class extended by Patient, LabTechnician, Pathologist, and Admin.
-- State Machine: Strict status transitions for diagnostic reports with custom exceptions.
+
+Demonstrates all four OOP pillars required for the capstone:
+
+  ENCAPSULATION:
+    All sensitive health attributes (_patient_id, _raw_lab_values, _status, _ai_summary)
+    are private (name-mangled via single underscore). They are only accessible through
+    explicit @property getters and validated setters that enforce business rules —
+    e.g., preventing edits to an approved report or age outside 0–150.
+
+  INHERITANCE:
+    The `User` base class holds shared properties (user_id, email, full_name, role).
+    Specialized subclasses — Patient, LabTechnician, Pathologist, Admin — all inherit
+    from `User` while adding role-specific attributes and overriding `can_perform()`.
+
+  POLYMORPHISM:
+    `can_perform(action)` is defined on the base `User` class and overridden by each
+    subclass to implement role-specific permission rules. This enables duck-typing across
+    the state machine transitions (submit, approve, reject, reopen).
+
+  ABSTRACTION:
+    The Report's state machine is exposed only through explicit transition methods
+    (submit_for_approval, approve, reject, reopen). Internal state is fully encapsulated.
+    The AI interpreter uses `IReportInterpreter` abstract interface in services/ai_interpreter.py.
 """
 
 from enum import Enum
@@ -324,7 +343,11 @@ class Report:
         self._updated_at = datetime.utcnow()
 
     def reject(self, pathologist: Pathologist, reason: str):
-        """Transition PENDING_APPROVAL -> REJECTED."""
+        """Transition PENDING_APPROVAL -> REJECTED.
+
+        POLYMORPHISM: Calls pathologist.can_perform() which is overridden per subclass.
+        ENCAPSULATION: Status is written only through this controlled transition method.
+        """
         if not pathologist.can_perform("reject_report"):
             raise UnauthorizedRoleException("Only a Pathologist can reject lab reports.")
 
@@ -337,6 +360,25 @@ class Report:
             raise DomainException("A valid rejection reason must be provided.")
 
         self._status = ReportStatus.REJECTED
-        self._approved_by_id = pathologist.user_id
+        self._approved_by_id = None  # Rejection does NOT constitute approval
         self._pathologist_notes = f"REJECTED: {reason.strip()}"
         self._updated_at = datetime.utcnow()
+
+    def reopen(self):
+        """Transition REJECTED -> DRAFT.
+
+        STATE MACHINE: Allows a Lab Technician to reopen a rejected report for
+        metric recalibration before resubmitting to the Pathologist review queue.
+        ENCAPSULATION: Resets private state fields via the controlled method only.
+        """
+        if self._status != ReportStatus.REJECTED:
+            raise InvalidStateTransitionException(
+                f"Cannot reopen report in '{self._status.value}' state. Must be REJECTED."
+            )
+
+        self._status = ReportStatus.DRAFT
+        self._ai_summary = None   # Force AI regeneration after metric recalibration
+        self._pathologist_notes = None
+        self._approved_by_id = None
+        self._updated_at = datetime.utcnow()
+

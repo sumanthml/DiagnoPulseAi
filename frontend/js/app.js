@@ -23,6 +23,8 @@ class AppController {
     this.pathologists = [];
     this.firebaseAuth = null;
     this.healthChart = null;
+    this.pendingRejectReportId = null;  // Used by rejection modal
+    this.pendingRejectPathologistId = null;
 
     this.glossaryDict = {
       "Hemoglobin": {
@@ -797,16 +799,30 @@ class AppController {
       }
 
       queueList.innerHTML = reports.map(r => `
-        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); padding:0.75rem; border-radius:10px; margin-bottom:0.75rem;">
+        <div style="background:rgba(255,255,255,0.03); border:1px solid ${
+          r.status === 'REJECTED' ? 'rgba(239,68,68,0.3)' :
+          r.status === 'APPROVED' ? 'rgba(16,185,129,0.25)' :
+          'var(--border-color)'
+        }; padding:0.75rem; border-radius:10px; margin-bottom:0.75rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
             <strong style="font-size:0.9rem;">${r.test_type}</strong>
-            <span class="status-badge ${r.status}">${r.status}</span>
+            <span class="status-badge ${r.status}">${r.status.replace('_', ' ')}</span>
           </div>
           <div style="font-size:0.775rem; color:var(--text-muted);">
-            Patient: ${r.patient_name} (${r.patient_mrn || 'MRN-884920'})
+            Patient: ${r.patient_name} (${r.patient_mrn || 'MRN—'})
           </div>
-          <div style="margin-top:0.5rem;">
-            <button class="btn btn-secondary btn-sm" onclick="app.viewReportModal('${r.id}')"><i class="fa-solid fa-eye"></i> Details</button>
+          ${r.status === 'REJECTED' ? `
+          <div style="font-size:0.75rem; color:var(--status-high); margin-top:0.3rem;">
+            <i class="fa-solid fa-circle-exclamation"></i> ${r.pathologist_notes || 'Rejected by Pathologist — requires recalibration.'}
+          </div>` : ''}
+          <div style="margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="app.viewReportModal('${r.id}')">
+              <i class="fa-solid fa-eye"></i> Details
+            </button>
+            ${r.status === 'REJECTED' ? `
+              <button class="btn btn-sm" style="background:rgba(58,134,255,0.15); border:1px solid rgba(58,134,255,0.3); color:var(--primary-blue);" onclick="app.handleReopenReport('${r.id}')">
+                <i class="fa-solid fa-rotate-left"></i> Reopen for Recalibration
+              </button>` : ''}
           </div>
         </div>
       `).join("");
@@ -892,35 +908,168 @@ class AppController {
   }
 
   async rejectReport(reportId) {
-    const reason = prompt("Enter rejection reason for lab re-testing:");
-    if (!reason) return;
+    // Show the rejection reason modal instead of blocking window.prompt
+    const pathologistId = this.pathologists[0] ? this.pathologists[0].id : "path-301";
+    this.pendingRejectReportId = reportId;
+    this.pendingRejectPathologistId = pathologistId;
+
+    const modal = document.getElementById("rejectionModal");
+    const textarea = document.getElementById("rejectionReasonInput");
+    if (modal) modal.classList.add("active");
+    if (textarea) textarea.value = "";
+  }
+
+  async confirmRejectReport() {
+    const reason = document.getElementById("rejectionReasonInput")?.value?.trim();
+    if (!reason || reason.length < 5) {
+      this.showToast("Please enter a detailed rejection reason (minimum 5 characters).", "error");
+      return;
+    }
+
+    const reportId = this.pendingRejectReportId;
+    const pathologistId = this.pendingRejectPathologistId;
+    this.closeRejectionModal();
 
     try {
-      const pathologistId = this.pathologists[0] ? this.pathologists[0].id : "path-301";
       await window.api.rejectReport(reportId, pathologistId, reason);
-      this.showToast("Report rejected.", "error");
+      this.showToast("Report rejected and returned to Lab Technician for recalibration.", "error");
       this.loadPathologistView();
     } catch (err) {
       this.showToast(err.message, "error");
     }
   }
 
+  closeRejectionModal() {
+    const modal = document.getElementById("rejectionModal");
+    if (modal) modal.classList.remove("active");
+    this.pendingRejectReportId = null;
+    this.pendingRejectPathologistId = null;
+  }
+
   async loadAdminView() {
+    // Load admin stats
+    this.loadAdminStats();
+
+    // Load audit logs
     const tbody = document.getElementById("adminAuditLogTable");
     try {
-      const logs = await window.api.getAuditLogs();
+      const logs = await window.api.getAuditLogs(100);
+      if (!logs.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">No audit events recorded yet.</td></tr>`;
+        return;
+      }
       tbody.innerHTML = logs.map(l => `
         <tr>
           <td><small>${l.timestamp.replace('T', ' ').substring(0, 19)}</small></td>
-          <td><strong>${l.user_name}</strong></td>
-          <td><span class="persona-badge">${l.user_role}</span></td>
+          <td><strong>${l.user_name || l.user_id}</strong></td>
+          <td><span class="persona-badge">${l.user_role || '—'}</span></td>
           <td><strong style="color:var(--primary-cyan);">${l.action}</strong></td>
-          <td>${l.entity_type} (${l.entity_id})</td>
-          <td><small style="color:var(--text-muted);">${l.details}</small></td>
+          <td>${l.entity_type} <small style="color:var(--text-muted);">(${l.entity_id.substring(0,12)}...)</small></td>
+          <td><small style="color:var(--text-muted);">${l.details || '—'}</small></td>
         </tr>
       `).join("");
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="6" class="text-high">${err.message}</td></tr>`;
+    }
+  }
+
+  async loadAdminStats() {
+    try {
+      const stats = await window.api.getAdminStats();
+      const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+      el("statNumReports", stats.reports?.total ?? 0);
+      el("statNumPending", stats.reports?.pending_approval ?? 0);
+      el("statNumApproved", stats.reports?.approved ?? 0);
+      el("statNumPatients", stats.users?.patients ?? 0);
+    } catch (err) {
+      console.warn("Admin stats error:", err.message);
+    }
+  }
+
+  async loadUserManagement() {
+    const roleFilter = document.getElementById("userRoleFilter")?.value || null;
+    const tbody = document.getElementById("adminUserTable");
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
+
+    try {
+      const users = await window.api.getAllAdminUsers(roleFilter || null);
+      const adminId = this.pathologists[0] ? "admin-401" : "admin-401"; // fallback
+
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td><strong>${u.full_name}</strong></td>
+          <td><small style="color:var(--text-muted);">${u.email}</small></td>
+          <td><span class="status-badge ${u.role === 'PATHOLOGIST' ? 'APPROVED' : u.role === 'PATIENT' ? 'DRAFT' : 'PENDING_APPROVAL'}">${u.role}</span></td>
+          <td><code style="font-size:0.75rem; color:var(--primary-cyan);">${u.mrn || u.employee_id || u.license_number || u.id}</code></td>
+          <td>
+            ${u.role !== 'ADMIN' ? `
+              <select class="form-control" style="width:auto; font-size:0.775rem; padding:0.3rem 0.55rem;" onchange="app.handleRoleChange('${u.id}', this.value)">
+                <option value="">Change role...</option>
+                <option value="PATIENT" ${u.role === 'PATIENT' ? 'disabled' : ''}>Patient</option>
+                <option value="LAB_TECHNICIAN" ${u.role === 'LAB_TECHNICIAN' ? 'disabled' : ''}>Lab Technician</option>
+                <option value="PATHOLOGIST" ${u.role === 'PATHOLOGIST' ? 'disabled' : ''}>Pathologist</option>
+              </select>` : '<small style="color:var(--text-muted);">System Admin</small>'}
+          </td>
+        </tr>
+      `).join("");
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-high">${err.message}</td></tr>`;
+    }
+  }
+
+  async handleRoleChange(userId, newRole) {
+    if (!newRole) return;
+    try {
+      await window.api.updateUserRole(userId, newRole, "admin-401");
+      this.showToast(`Role updated to ${newRole} successfully!`, "success");
+      this.loadUserManagement();
+    } catch (err) {
+      this.showToast(err.message, "error");
+    }
+  }
+
+  switchAdminTab(tab) {
+    // Toggle tab buttons
+    ["Audit", "Users", "Templates"].forEach(t => {
+      const btn = document.getElementById(`adminTab${t}`);
+      if (btn) btn.classList.toggle("active", t.toLowerCase() === tab);
+    });
+    // Toggle panels
+    const panelMap = { audit: "adminPanelAudit", users: "adminPanelUsers", templates: "adminPanelTemplates" };
+    Object.entries(panelMap).forEach(([key, id]) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = key === tab ? "" : "none";
+    });
+    // Lazy-load user management
+    if (tab === "users") this.loadUserManagement();
+  }
+
+  addTemplateMetricRow() {
+    const container = document.getElementById("tplMetricsContainer");
+    if (!container) return;
+    const idx = container.children.length;
+    const row = document.createElement("div");
+    row.className = "tpl-metric-row";
+    row.id = `tplMetric${idx}`;
+    row.innerHTML = `
+      <input type="text" class="form-control tpl-metric-name" placeholder="Metric name" style="flex:2;" />
+      <input type="text" class="form-control tpl-metric-unit" placeholder="Unit" style="flex:1;" />
+      <input type="number" step="0.01" class="form-control tpl-metric-min" placeholder="Ref Min" style="flex:1;" />
+      <input type="number" step="0.01" class="form-control tpl-metric-max" placeholder="Ref Max" style="flex:1;" />
+      <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="flex-shrink:0;"><i class="fa-solid fa-trash"></i></button>
+    `;
+    container.appendChild(row);
+  }
+
+  async handleReopenReport(reportId) {
+    try {
+      await window.api.reopenReport(reportId);
+      this.showToast("Report reopened to DRAFT for recalibration.", "success");
+      this.loadTechnicianView();
+    } catch (err) {
+      this.showToast(err.message, "error");
     }
   }
 
@@ -997,21 +1146,86 @@ class AppController {
     document.getElementById("reportModal").classList.remove("active");
   }
 
+  // --- Mobile Sidebar ---
+  toggleMobileSidebar() {
+    const sidebar = document.querySelector(".app-sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    sidebar?.classList.toggle("mobile-open");
+    overlay?.classList.toggle("active");
+  }
+
+  closeMobileSidebar() {
+    const sidebar = document.querySelector(".app-sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    sidebar?.classList.remove("mobile-open");
+    overlay?.classList.remove("active");
+  }
+
   showToast(message, type = "info") {
     const container = document.getElementById("toastContainer");
     if (!container) return;
 
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> ${message}`;
+    const icon = type === "success" ? "fa-circle-check" : type === "error" ? "fa-circle-exclamation" : "fa-circle-info";
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${message}`;
     container.appendChild(toast);
 
     setTimeout(() => {
-      toast.remove();
+      toast.style.opacity = "0";
+      toast.style.transition = "opacity 0.3s ease";
+      setTimeout(() => toast.remove(), 350);
     }, 4000);
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   window.app = new AppController();
+
+  // Wire up Test Template form submission (Admin panel)
+  const tplForm = document.getElementById("adminTemplateForm");
+  if (tplForm) {
+    tplForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("tplName")?.value?.trim();
+      const code = document.getElementById("tplCode")?.value?.trim();
+      const category = document.getElementById("tplCategory")?.value?.trim();
+      const description = document.getElementById("tplDescription")?.value?.trim();
+
+      const metricRows = document.querySelectorAll(".tpl-metric-row");
+      const metrics = [];
+      metricRows.forEach(row => {
+        const mName = row.querySelector(".tpl-metric-name")?.value?.trim();
+        const mUnit = row.querySelector(".tpl-metric-unit")?.value?.trim();
+        const mMin = parseFloat(row.querySelector(".tpl-metric-min")?.value);
+        const mMax = parseFloat(row.querySelector(".tpl-metric-max")?.value);
+        if (mName && mUnit && !isNaN(mMin) && !isNaN(mMax)) {
+          metrics.push({ metric_name: mName, unit: mUnit, ref_min: mMin, ref_max: mMax });
+        }
+      });
+
+      if (!name || !code || !category) {
+        window.app.showToast("Please fill in Name, Code, and Category.", "error");
+        return;
+      }
+
+      try {
+        await window.api.createTestTemplate({ name, code, category, description, metrics });
+        window.app.showToast(`Template '${name}' created successfully!`, "success");
+        tplForm.reset();
+        document.getElementById("tplMetricsContainer").innerHTML = `
+          <div class="tpl-metric-row" id="tplMetric0">
+            <input type="text" class="form-control tpl-metric-name" placeholder="Metric name" style="flex:2;" />
+            <input type="text" class="form-control tpl-metric-unit" placeholder="Unit" style="flex:1;" />
+            <input type="number" step="0.01" class="form-control tpl-metric-min" placeholder="Ref Min" style="flex:1;" />
+            <input type="number" step="0.01" class="form-control tpl-metric-max" placeholder="Ref Max" style="flex:1;" />
+          </div>
+        `;
+        // Reload test templates so new one appears in lab tech form
+        await window.app.loadInitialData();
+      } catch (err) {
+        window.app.showToast(err.message, "error");
+      }
+    });
+  }
 });

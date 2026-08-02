@@ -28,7 +28,11 @@ class DiagnosticAnalyzerStrategy(ABC):
 
 
 class BloodTestStrategy(DiagnosticAnalyzerStrategy):
-    """Polymorphic strategy for Complete Blood Count (CBC)."""
+    """Polymorphic strategy for Complete Blood Count (CBC).
+
+    POLYMORPHISM: Implements evaluate_ranges() contract from DiagnosticAnalyzerStrategy.
+    ENCAPSULATION: Reference bounds are private to this class; no external access.
+    """
 
     def get_test_type(self) -> str:
         return "Complete Blood Count (CBC)"
@@ -37,15 +41,15 @@ class BloodTestStrategy(DiagnosticAnalyzerStrategy):
         flags = []
         is_male = gender.upper() in ["M", "MALE"]
 
-        # Hemoglobin (Hb) bounds (g/dL)
+        # Hemoglobin (Hb) bounds (g/dL) — gender-adjusted
         min_hb = 13.8 if is_male else 12.1
         max_hb = 17.2 if is_male else 15.1
 
         ref_bounds = {
-            "Hemoglobin": {"min": min_hb, "max": max_hb, "unit": "g/dL"},
-            "WBC": {"min": 4.5, "max": 11.0, "unit": "10^3/µL"},
-            "RBC": {"min": 4.3 if is_male else 3.8, "max": 5.9 if is_male else 5.2, "unit": "10^6/µL"},
-            "Platelets": {"min": 150.0, "max": 450.0, "unit": "10^3/µL"},
+            "Hemoglobin": {"min": min_hb, "max": max_hb, "critical_low": 7.0, "critical_high": 20.0, "unit": "g/dL"},
+            "WBC": {"min": 4.5, "max": 11.0, "critical_low": 2.0, "critical_high": 30.0, "unit": "10^3/\u00b5L"},
+            "RBC": {"min": 4.3 if is_male else 3.8, "max": 5.9 if is_male else 5.2, "unit": "10^6/\u00b5L"},
+            "Platelets": {"min": 150.0, "max": 450.0, "critical_low": 50.0, "critical_high": 1000.0, "unit": "10^3/\u00b5L"},
         }
 
         for entry in metrics:
@@ -57,7 +61,13 @@ class BloodTestStrategy(DiagnosticAnalyzerStrategy):
             severity = FlagSeverity.NORMAL
             message = "Within reference limits"
 
-            if val < bounds["min"]:
+            if "critical_low" in bounds and val < bounds["critical_low"]:
+                severity = FlagSeverity.CRITICAL
+                message = f"CRITICAL: Dangerously low — immediate clinical attention required ({bounds['critical_low']} {bounds['unit']})"
+            elif "critical_high" in bounds and val > bounds["critical_high"]:
+                severity = FlagSeverity.CRITICAL
+                message = f"CRITICAL: Dangerously elevated — immediate clinical attention required ({bounds['critical_high']} {bounds['unit']})"
+            elif val < bounds["min"]:
                 severity = FlagSeverity.LOW
                 message = f"Below normal threshold ({bounds['min']} {bounds['unit']})"
             elif val > bounds['max']:
@@ -74,6 +84,7 @@ class BloodTestStrategy(DiagnosticAnalyzerStrategy):
                 "message": message
             })
         return flags
+
 
 
 class LipidProfileStrategy(DiagnosticAnalyzerStrategy):
@@ -249,8 +260,62 @@ class MetabolicPanelStrategy(DiagnosticAnalyzerStrategy):
         return flags
 
 
+class UrineAnalysisStrategy(DiagnosticAnalyzerStrategy):
+    """Polymorphic strategy for Urinalysis (Urine Routine Examination).
+
+    POLYMORPHISM: 6th concrete implementation of DiagnosticAnalyzerStrategy.
+    Demonstrates that the Strategy Pattern is fully extensible — new clinical
+    panels can be added without modifying any existing code (Open/Closed Principle).
+    """
+
+    def get_test_type(self) -> str:
+        return "Urinalysis"
+
+    def evaluate_ranges(self, metrics: List[MetricEntry], age: int, gender: str) -> List[Dict[str, Any]]:
+        flags = []
+        ref_bounds = {
+            "Urine pH": {"min": 4.5, "max": 8.0, "unit": "pH"},
+            "Specific Gravity": {"min": 1.005, "max": 1.030, "unit": "SG"},
+            "Protein (Urine)": {"min": 0.0, "max": 14.0, "unit": "mg/dL"},
+            "Glucose (Urine)": {"min": 0.0, "max": 15.0, "unit": "mg/dL"},
+            "WBC (Urine)": {"min": 0.0, "max": 5.0, "unit": "cells/\u00b5L"},
+        }
+
+        for entry in metrics:
+            bounds = ref_bounds.get(entry.name)
+            if not bounds:
+                continue
+
+            val = entry.value
+            severity = FlagSeverity.NORMAL
+            message = "Within normal urinalysis limits"
+
+            if val < bounds["min"]:
+                severity = FlagSeverity.LOW
+                message = f"Below acceptable range ({bounds['min']}-{bounds['max']} {bounds['unit']})"
+            elif val > bounds["max"]:
+                severity = FlagSeverity.HIGH if val < (bounds["max"] * 2) else FlagSeverity.CRITICAL
+                message = f"Elevated beyond normal limit (Ref: {bounds['min']}-{bounds['max']} {bounds['unit']})"
+
+            flags.append({
+                "metric_name": entry.name,
+                "value": val,
+                "unit": entry.unit,
+                "ref_min": bounds["min"],
+                "ref_max": bounds["max"],
+                "severity": severity.value,
+                "message": message
+            })
+        return flags
+
+
 class StrategyFactory:
-    """Factory to instantiate the concrete DiagnosticAnalyzerStrategy for a given panel."""
+    """Factory to instantiate the concrete DiagnosticAnalyzerStrategy for a given panel.
+
+    ABSTRACTION: Application code calls StrategyFactory.get_strategy(test_type) without
+    knowing which concrete strategy will be returned. The factory resolves the mapping
+    internally, decoupling the caller from strategy implementation details.
+    """
 
     _strategies: Dict[str, DiagnosticAnalyzerStrategy] = {
         "cbc": BloodTestStrategy(),
@@ -263,6 +328,9 @@ class StrategyFactory:
         "liver function test": LiverFunctionStrategy(),
         "metabolic": MetabolicPanelStrategy(),
         "metabolic panel": MetabolicPanelStrategy(),
+        "urine": UrineAnalysisStrategy(),
+        "urinalysis": UrineAnalysisStrategy(),
+        "urine routine": UrineAnalysisStrategy(),
     }
 
     @classmethod
@@ -273,3 +341,4 @@ class StrategyFactory:
                 return strategy
         # Fallback to BloodTestStrategy
         return BloodTestStrategy()
+

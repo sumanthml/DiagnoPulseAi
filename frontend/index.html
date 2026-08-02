@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Diagnostics - Patient Health Portal</title>
+  <title>Smart Diagnostics — Lab Report & Test Management System</title>
+  <meta name="description" content="AI-powered lab report interpretation system with multi-role portals for Patients, Lab Technicians, Pathologists, and Administrators. Built with Object-Oriented Design principles." />
 
   <!-- Google Fonts & FontAwesome 6 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -175,10 +176,17 @@
       </div>
     </aside>
 
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-mobile-overlay" id="sidebarOverlay" onclick="app.closeMobileSidebar()"></div>
+
     <!-- Right Workspace Area -->
     <div class="app-main-workspace">
       <!-- Top Action Bar -->
       <header class="top-bar">
+        <!-- Mobile hamburger -->
+        <button class="btn-hamburger" id="btnHamburger" onclick="app.toggleMobileSidebar()" title="Open Menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
         <div class="top-search">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input type="text" id="topSearchInput" placeholder="Search lab tests or metrics..." oninput="app.handleLiveSearch(this.value)" />
@@ -414,30 +422,163 @@
         <section class="dashboard-view" id="viewAdmin">
           <div class="view-header">
             <div>
-              <h2><i class="fa-solid fa-shield-halved text-purple"></i> Platform Administration</h2>
-              <p>Manage test templates, inspect database schemas, and query immutable HIPAA audit logs.</p>
+              <h2><i class="fa-solid fa-shield-halved text-purple"></i> Platform Administration Console</h2>
+              <p>Manage users, configure test templates, and inspect immutable HIPAA compliance audit logs.</p>
             </div>
-            <button class="btn btn-primary" onclick="app.loadAdminView()"><i class="fa-solid fa-rotate"></i> Refresh Audit Trail</button>
+            <button class="btn btn-primary" onclick="app.loadAdminView()"><i class="fa-solid fa-rotate"></i> Refresh</button>
           </div>
 
-          <div class="glass-card">
-            <h3><i class="fa-solid fa-clock-rotate-left"></i> System Immutable Audit Logs</h3>
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Role</th>
-                    <th>Action</th>
-                    <th>Entity</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody id="adminAuditLogTable">
-                  <!-- Dynamically populated -->
-                </tbody>
-              </table>
+          <!-- Admin Stats Cards Row -->
+          <div class="admin-stats-grid" id="adminStatsGrid">
+            <div class="stat-card" id="statTotalReports">
+              <div class="stat-icon blue"><i class="fa-solid fa-file-medical"></i></div>
+              <div class="stat-body">
+                <div class="stat-number" id="statNumReports">—</div>
+                <div class="stat-label">Total Reports</div>
+              </div>
+            </div>
+            <div class="stat-card" id="statPending">
+              <div class="stat-icon amber"><i class="fa-solid fa-clock"></i></div>
+              <div class="stat-body">
+                <div class="stat-number" id="statNumPending">—</div>
+                <div class="stat-label">Pending Approval</div>
+              </div>
+            </div>
+            <div class="stat-card" id="statApproved">
+              <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+              <div class="stat-body">
+                <div class="stat-number" id="statNumApproved">—</div>
+                <div class="stat-label">Approved Reports</div>
+              </div>
+            </div>
+            <div class="stat-card" id="statPatients">
+              <div class="stat-icon purple"><i class="fa-solid fa-hospital-user"></i></div>
+              <div class="stat-body">
+                <div class="stat-number" id="statNumPatients">—</div>
+                <div class="stat-label">Registered Patients</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- OOP Architecture Banner -->
+          <div class="oop-banner">
+            <div class="oop-banner-title"><i class="fa-solid fa-code"></i> OOP Architecture Active</div>
+            <div class="oop-pills">
+              <span class="oop-pill"><i class="fa-solid fa-lock"></i> Encapsulation</span>
+              <span class="oop-pill"><i class="fa-solid fa-sitemap"></i> Inheritance</span>
+              <span class="oop-pill"><i class="fa-solid fa-shapes"></i> Polymorphism</span>
+              <span class="oop-pill"><i class="fa-solid fa-layer-group"></i> Abstraction</span>
+            </div>
+          </div>
+
+          <!-- Admin Tabs -->
+          <div class="admin-tab-bar">
+            <button class="admin-tab active" id="adminTabAudit" onclick="app.switchAdminTab('audit')"><i class="fa-solid fa-clock-rotate-left"></i> Audit Logs</button>
+            <button class="admin-tab" id="adminTabUsers" onclick="app.switchAdminTab('users')"><i class="fa-solid fa-users-gear"></i> User Management</button>
+            <button class="admin-tab" id="adminTabTemplates" onclick="app.switchAdminTab('templates')"><i class="fa-solid fa-flask"></i> Test Templates</button>
+          </div>
+
+          <!-- Audit Logs Panel -->
+          <div class="admin-panel" id="adminPanelAudit">
+            <div class="glass-card">
+              <h3><i class="fa-solid fa-clock-rotate-left"></i> System Immutable Audit Trail
+                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400; margin-left:0.5rem;">Chronological log of all CREATE, APPROVE, REJECT, REOPEN actions</span>
+              </h3>
+              <div class="table-responsive">
+                <table class="data-table" id="adminAuditTable">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>User</th>
+                      <th>Role</th>
+                      <th>Action</th>
+                      <th>Entity</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminAuditLogTable">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- User Management Panel -->
+          <div class="admin-panel" id="adminPanelUsers" style="display:none;">
+            <div class="glass-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3><i class="fa-solid fa-users-gear"></i> System User Management</h3>
+                <div style="display:flex; gap:0.5rem;">
+                  <select class="form-control" id="userRoleFilter" style="width:auto;" onchange="app.loadUserManagement()">
+                    <option value="">All Roles</option>
+                    <option value="PATIENT">Patients</option>
+                    <option value="LAB_TECHNICIAN">Lab Technicians</option>
+                    <option value="PATHOLOGIST">Pathologists</option>
+                    <option value="ADMIN">Admins</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Current Role</th>
+                      <th>Identifier</th>
+                      <th>Change Role</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminUserTable">
+                    <tr><td colspan="5" style="text-align:center; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading users...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Template Configurator Panel -->
+          <div class="admin-panel" id="adminPanelTemplates" style="display:none;">
+            <div class="glass-card">
+              <h3><i class="fa-solid fa-flask"></i> Diagnostic Test Template Configurator</h3>
+              <p style="font-size:0.825rem; color:var(--text-muted); margin-bottom:1.25rem;">Add new clinical test panels with metric reference ranges. All templates are applied in real-time to the Lab Technician entry form via the Strategy Pattern.</p>
+
+              <form id="adminTemplateForm">
+                <div class="form-group-row">
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-tag"></i> Template Name</label>
+                    <input type="text" id="tplName" class="form-control" placeholder="e.g. Iron Studies Panel" required />
+                  </div>
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-code"></i> Template Code</label>
+                    <input type="text" id="tplCode" class="form-control" placeholder="e.g. ISP-007" required />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label><i class="fa-solid fa-stethoscope"></i> Clinical Category</label>
+                  <input type="text" id="tplCategory" class="form-control" placeholder="e.g. Hematology" required />
+                </div>
+                <div class="form-group">
+                  <label><i class="fa-solid fa-align-left"></i> Description</label>
+                  <input type="text" id="tplDescription" class="form-control" placeholder="Brief clinical purpose of this panel" />
+                </div>
+
+                <div class="form-section-title" style="margin: 1rem 0 0.75rem 0;"><span>Metric Reference Ranges</span></div>
+                <div id="tplMetricsContainer">
+                  <div class="tpl-metric-row" id="tplMetric0">
+                    <input type="text" class="form-control tpl-metric-name" placeholder="Metric name (e.g. Serum Iron)" style="flex:2;" />
+                    <input type="text" class="form-control tpl-metric-unit" placeholder="Unit (e.g. µg/dL)" style="flex:1;" />
+                    <input type="number" step="0.01" class="form-control tpl-metric-min" placeholder="Ref Min" style="flex:1;" />
+                    <input type="number" step="0.01" class="form-control tpl-metric-max" placeholder="Ref Max" style="flex:1;" />
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:0.75rem; margin-top:1rem;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="app.addTemplateMetricRow()"><i class="fa-solid fa-plus"></i> Add Metric</button>
+                  <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Template</button>
+                </div>
+              </form>
             </div>
           </div>
         </section>
@@ -451,11 +592,37 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="modalReportTitle">Diagnostic Report Details</h3>
-        <button class="modal-close" onclick="app.closeModal()">&times;</button>
+        <button class="modal-close" onclick="app.closeModal()">&#x00D7;</button>
       </div>
       <div class="modal-body" id="modalReportBody"></div>
       <div class="modal-footer" id="modalReportFooter">
         <button class="btn btn-secondary" onclick="app.closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rejection Reason Modal (replaces window.prompt) -->
+  <div class="modal-overlay" id="rejectionModal">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-circle-xmark" style="color:var(--status-high);"></i> Reject Report &mdash; Enter Reason</h3>
+        <button class="modal-close" onclick="app.closeRejectionModal()">&#x00D7;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+          Provide a clear clinical reason for rejection. This message will be sent back to the Lab Technician for recalibration.
+        </p>
+        <div class="form-group">
+          <label><i class="fa-solid fa-comment-medical"></i> Rejection Reason</label>
+          <textarea class="form-control" id="rejectionReasonInput" rows="4"
+            placeholder="e.g. Hemoglobin value appears inconsistent with clinical history. Please retest using validated sample."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:0.75rem;">
+        <button class="btn btn-secondary" onclick="app.closeRejectionModal()">Cancel</button>
+        <button class="btn btn-danger" id="btnConfirmReject" onclick="app.confirmRejectReport()">
+          <i class="fa-solid fa-circle-xmark"></i> Confirm Rejection
+        </button>
       </div>
     </div>
   </div>

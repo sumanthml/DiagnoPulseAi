@@ -87,7 +87,7 @@ def create_test_template(payload: TemplateCreateSchema, db: Session = Depends(ge
 
     AuditLogger.log_event(
         db=db,
-        user_id="admin-401",
+        user_id="system",  # Template creation is a system-level administrative action
         action="CREATE_TEST_TEMPLATE",
         entity_type="TEST_TEMPLATE",
         entity_id=template_id,

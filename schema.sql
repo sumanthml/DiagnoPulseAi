@@ -99,10 +99,10 @@ CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
 
 -- Seed System Users
 INSERT INTO users (id, email, full_name, role, age, gender, mrn, employee_id, license_number) VALUES
-('pat-101', 'john.doe@patient.com', 'John Doe', 'PATIENT', 42, 'Male', 'MRN-884920', NULL, NULL),
-('pat-102', 'sarah.smith@patient.com', 'Sarah Smith', 'PATIENT', 35, 'Female', 'MRN-773104', NULL, NULL),
+('pat-101', 'sumanth.sunny@patient.com', 'Sumanth Sunny', 'PATIENT', 30, 'Male', 'MRN-884920', NULL, NULL),
+('pat-102', 'alex.johnson@patient.com', 'Alex Johnson', 'PATIENT', 28, 'Female', 'MRN-773104', NULL, NULL),
 ('tech-201', 'alex.tech@diagnopulse.com', 'Alex Tech (Lab Tech)', 'LAB_TECHNICIAN', NULL, NULL, NULL, 'LT-4091', NULL),
-('path-301', 'dr.roberts@diagnopulse.com', 'Dr. Eleanor Roberts, MD', 'PATHOLOGIST', NULL, NULL, NULL, NULL, 'MD-PATH-99302'),
+('path-301', 'dr.roberts@diagnopulse.com', 'Dr. Eleanor Roberts, MD (Pathologist)', 'PATHOLOGIST', NULL, NULL, NULL, NULL, 'MD-PATH-99302'),
 ('admin-401', 'admin@diagnopulse.com', 'System Admin', 'ADMIN', NULL, NULL, NULL, NULL, NULL);
 
 -- Seed Diagnostic Test Templates
@@ -111,7 +111,8 @@ INSERT INTO test_templates (id, name, code, category, description) VALUES
 ('tpl-lipid', 'Lipid Profile', 'LIP-002', 'Cardiology / Biochemistry', 'Measures circulating cholesterol and triglycerides to assess cardiovascular risk.'),
 ('tpl-thyroid', 'Thyroid Profile', 'THY-003', 'Endocrinology', 'Assesses thyroid gland activity and metabolic hormone levels.'),
 ('tpl-liver', 'Liver Function Test', 'LFT-004', 'Hepatology', 'Evaluates hepatic enzymes, proteins, and bilirubin synthesis.'),
-('tpl-metabolic', 'Metabolic Panel', 'CMP-005', 'Biochemistry', 'Checks blood sugar balance, electrolyte equilibrium, and renal function.');
+('tpl-metabolic', 'Metabolic Panel', 'CMP-005', 'Biochemistry', 'Checks blood sugar balance, electrolyte equilibrium, and renal function.'),
+('tpl-urine', 'Urinalysis', 'URN-006', 'Nephrology / Biochemistry', 'Routine urine examination assessing kidney function, infection markers, and metabolic waste.');
 
 -- Seed Template Metrics
 INSERT INTO template_metrics (id, template_id, metric_name, unit, ref_min, ref_max) VALUES
@@ -133,7 +134,13 @@ INSERT INTO template_metrics (id, template_id, metric_name, unit, ref_min, ref_m
 ('m-glu', 'tpl-metabolic', 'Fasting Glucose', 'mg/dL', 70.0, 99.0),
 ('m-cre', 'tpl-metabolic', 'Serum Creatinine', 'mg/dL', 0.7, 1.3),
 ('m-na', 'tpl-metabolic', 'Sodium', 'mEq/L', 135.0, 145.0),
-('m-k', 'tpl-metabolic', 'Potassium', 'mEq/L', 3.5, 5.0);
+('m-k', 'tpl-metabolic', 'Potassium', 'mEq/L', 3.5, 5.0),
+-- Urinalysis Panel
+('m-uph', 'tpl-urine', 'Urine pH', 'pH', 4.5, 8.0),
+('m-usg', 'tpl-urine', 'Specific Gravity', 'SG', 1.005, 1.030),
+('m-upro', 'tpl-urine', 'Protein (Urine)', 'mg/dL', 0.0, 14.0),
+('m-uglu', 'tpl-urine', 'Glucose (Urine)', 'mg/dL', 0.0, 15.0),
+('m-uwbc', 'tpl-urine', 'WBC (Urine)', 'cells/µL', 0.0, 5.0);
 
 -- Seed Sample Report
 INSERT INTO reports (id, patient_id, technician_id, approved_by_id, test_type, status, ai_summary, pathologist_notes) VALUES

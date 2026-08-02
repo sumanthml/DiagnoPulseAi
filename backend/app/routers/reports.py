@@ -14,7 +14,7 @@ from app.database.models import DBReport, DBReportMetric, DBUser, DBAuditLog
 from app.domain.models import (
     ReportStatus, UserRole, MetricEntry, Report,
     Patient, LabTechnician, Pathologist, Admin,
-    InvalidStateTransitionException, InvalidMetricValueException, UnauthorizedRoleException
+    DomainException, InvalidStateTransitionException, InvalidMetricValueException, UnauthorizedRoleException
 )
 from app.domain.strategies import StrategyFactory
 from app.domain.anonymizer import AnonymizerService
@@ -47,11 +47,36 @@ class PathologistReviewSchema(BaseModel):
     rejection_reason: Optional[str] = None
 
 
+@router.get("/stats")
+def get_report_stats(db: Session = Depends(get_db)):
+    """Returns platform-wide diagnostic report statistics for the Admin console."""
+    from sqlalchemy import func
+    total = db.query(DBReport).count()
+    pending = db.query(DBReport).filter(DBReport.status == ReportStatus.PENDING_APPROVAL.value).count()
+    approved = db.query(DBReport).filter(DBReport.status == ReportStatus.APPROVED.value).count()
+    rejected = db.query(DBReport).filter(DBReport.status == ReportStatus.REJECTED.value).count()
+    draft = db.query(DBReport).filter(DBReport.status == ReportStatus.DRAFT.value).count()
+    total_patients = db.query(DBUser).filter(DBUser.role == UserRole.PATIENT.value).count()
+    total_techs = db.query(DBUser).filter(DBUser.role == UserRole.LAB_TECHNICIAN.value).count()
+    total_pathologists = db.query(DBUser).filter(DBUser.role == UserRole.PATHOLOGIST.value).count()
+    return {
+        "total_reports": total,
+        "pending_approval": pending,
+        "approved": approved,
+        "rejected": rejected,
+        "draft": draft,
+        "total_patients": total_patients,
+        "total_technicians": total_techs,
+        "total_pathologists": total_pathologists
+    }
+
+
 @router.get("")
 def list_reports(
     patient_id: Optional[str] = None,
     status_filter: Optional[str] = None,
     role_view: Optional[str] = None,
+    technician_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Lists diagnostic reports filtered by role and status."""
@@ -59,6 +84,9 @@ def list_reports(
 
     if patient_id:
         query = query.filter(DBReport.patient_id == patient_id)
+
+    if technician_id:
+        query = query.filter(DBReport.technician_id == technician_id)
 
     if status_filter:
         query = query.filter(DBReport.status == status_filter.upper())
@@ -340,7 +368,8 @@ def reject_report(report_id: str, payload: PathologistReviewSchema, db: Session 
         reason = payload.rejection_reason or "Metrics require re-testing or recalibration."
         report_domain.reject(doctor_domain, reason=reason)
         r.status = report_domain.status.value
-        r.approved_by_id = doctor.id
+        # Do NOT set approved_by_id on rejection — pathologist did NOT approve this report
+        r.approved_by_id = None
         r.pathologist_notes = f"REJECTED: {reason}"
         db.commit()
 
@@ -350,13 +379,53 @@ def reject_report(report_id: str, payload: PathologistReviewSchema, db: Session 
             action="REJECT_REPORT",
             entity_type="REPORT",
             entity_id=report_id,
-            details=f"Pathologist rejected report: {reason}"
+            details=f"Pathologist {doctor.full_name} rejected report: {reason}"
         )
 
-        return {"message": "Report rejected.", "status": r.status}
+        return {"message": "Report rejected and sent back to Lab Technician.", "status": r.status}
 
     except (InvalidStateTransitionException, UnauthorizedRoleException, DomainException) as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{report_id}/reopen")
+def reopen_report(report_id: str, db: Session = Depends(get_db)):
+    """
+    Transitions REJECTED -> DRAFT.
+    Allows Lab Technician to recalibrate and resubmit a rejected diagnostic report.
+    """
+    r = db.query(DBReport).filter(DBReport.id == report_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Report not found.")
+
+    if r.status != ReportStatus.REJECTED.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only REJECTED reports can be reopened. Current status: {r.status}"
+        )
+
+    # Apply domain-level reopen transition
+    metrics = [MetricEntry(m.metric_name, m.value, m.unit) for m in r.report_metrics]
+    report_domain = Report(r.id, r.patient_id, r.technician_id, r.test_type, metrics)
+    report_domain._status = ReportStatus(r.status)
+    report_domain.reopen()
+
+    r.status = report_domain.status.value
+    r.ai_summary = None  # Reset AI summary so technician must regenerate after corrections
+    r.pathologist_notes = None
+    r.approved_by_id = None
+    db.commit()
+
+    AuditLogger.log_event(
+        db=db,
+        user_id=r.technician_id,
+        action="REOPEN_REPORT",
+        entity_type="REPORT",
+        entity_id=report_id,
+        details="Rejected report reopened to DRAFT for recalibration by Lab Technician."
+    )
+
+    return {"message": "Report reopened to DRAFT for recalibration.", "status": r.status}
 
 
 @router.get("/{report_id}/pdf")
